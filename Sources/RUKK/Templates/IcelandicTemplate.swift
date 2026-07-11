@@ -84,7 +84,23 @@ struct IcelandicTemplate: View {
                 Text(settings.companyName.isEmpty ? s.companyPlaceholder : settings.companyName.uppercased())
                     .font(font(settings.headingFontSize, weight: .black))
             }
-            Spacer(minLength: 24)
+            Spacer(minLength: 16)
+
+            // QR-kóði fyrir reikning (miðjusvæðið)
+            if !invoice.number.isEmpty,
+               let qrCGImage = InvoiceQRCode(
+                   invoiceNumber: invoice.number,
+                   date: invoice.issueDate,
+                   amount: invoice.total
+               ).generateCGImage(size: 100) {
+                Image(nsImage: NSImage(cgImage: qrCGImage, size: NSSize(width: 100, height: 100)))
+                    .resizable()
+                    .interpolation(.none)
+                    .frame(width: 100, height: 100)
+                    .background(Color.white)
+            }
+
+            Spacer(minLength: 16)
             VStack(alignment: .trailing, spacing: 2) {
                 // Röð skv. mynd: nafn → kt. → heimilisfang+sími → netfang → reikningsnr. → VSK-númer
                 Text(settings.companyName).font(font(15, weight: .bold))

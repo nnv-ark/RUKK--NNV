@@ -44,6 +44,7 @@
 		3000000000000000000000B4 /* CustomStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B4 /* CustomStatus.swift */; };
 		3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B5 /* IcelandicTemplate.swift */; };
 		3000000000000000000000F2 /* UniversalTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F2 /* UniversalTemplate.swift */; };
+		DEE1F1C5BF8D47E281726E3D70EC727B /* InvoiceQRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31808B6D56743B1A18B0692E11867F3 /* InvoiceQRCode.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -86,6 +87,7 @@
 		2000000000000000000000B4 /* CustomStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomStatus.swift; sourceTree = "<group>"; };
 		2000000000000000000000B5 /* IcelandicTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IcelandicTemplate.swift; sourceTree = "<group>"; };
 		2000000000000000000000F2 /* UniversalTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalTemplate.swift; sourceTree = "<group>"; };
+		F31808B6D56743B1A18B0692E11867F3 /* InvoiceQRCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceQRCode.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -194,6 +196,7 @@
 				2000000000000000000000B5 /* IcelandicTemplate.swift */,
 				2000000000000000000000F2 /* UniversalTemplate.swift */,
 				2000000000000000000000AA /* InvoiceTemplate.swift */,
+				F31808B6D56743B1A18B0692E11867F3 /* InvoiceQRCode.swift */,
 			);
 			path = Templates;
 			sourceTree = "<group>";
@@ -323,6 +326,7 @@
 				3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */,
 				3000000000000000000000F2 /* UniversalTemplate.swift in Sources */,
 				3000000000000000000000AA /* InvoiceTemplate.swift in Sources */,
+				DEE1F1C5BF8D47E281726E3D70EC727B /* InvoiceQRCode.swift in Sources */,
 				3000000000000000000000AC /* ContactsView.swift in Sources */,
 				3000000000000000000000AD /* ContentView.swift in Sources */,
 				3000000000000000000000AE /* InvoiceDetailView.swift in Sources */,
