@@ -9,6 +9,8 @@ struct CustomerDetailView: View {
 
     private var currency: String { contact.owner?.defaultCurrencyCode ?? "ISK" }
     private var invoices: [Invoice] { contact.invoices }
+    /// Aðeins lagalegir reikningar — tilboð eru undanskilin sölutölum viðskiptavinar.
+    private var billedInvoices: [Invoice] { invoices.filter { !$0.isEstimate } }
 
     var body: some View {
         Form {
@@ -33,7 +35,9 @@ struct CustomerDetailView: View {
                 ForEach(invoices.sorted { $0.createdAt > $1.createdAt }) { inv in
                     Button { openInvoice(inv) } label: {
                         HStack {
-                            Text(inv.number.isEmpty ? "(ekkert nr.)" : inv.number)
+                            Text(inv.isEstimate
+                                 ? (inv.estimateNumber.isEmpty ? "(tilboð)" : inv.estimateNumber)
+                                 : (inv.number.isEmpty ? "(ekkert nr.)" : inv.number))
                             Text(inv.issueDate.formatted(date: .numeric, time: .omitted))
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
@@ -101,7 +105,7 @@ struct CustomerDetailView: View {
 
     private var kpiGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-            kpi("Reikningar", "\(invoices.count)", "doc.text")
+            kpi("Reikningar", "\(billedInvoices.count)", "doc.text")
             kpi("Heildarupphæð", Money.format(totalAll, currencyCode: currency), "sum")
             kpi("Greitt", Money.format(paidTotal, currencyCode: currency), "checkmark.circle", .green)
             kpi("Útistandandi", Money.format(outstanding, currencyCode: currency), "clock", outstanding > 0 ? .orange : .secondary)
@@ -157,27 +161,27 @@ struct CustomerDetailView: View {
 
     // MARK: - Metrics
 
-    private var totalAll: Decimal { invoices.reduce(0) { $0 + $1.total } }
+    private var totalAll: Decimal { billedInvoices.reduce(0) { $0 + $1.total } }
 
     private var paidTotal: Decimal {
-        invoices.filter { $0.status == .paid }.reduce(0) { $0 + $1.total }
+        billedInvoices.filter { $0.status == .paid }.reduce(0) { $0 + $1.total }
     }
 
     private var outstanding: Decimal {
-        invoices.filter { $0.status != .paid && $0.status != .cancelled && $0.status != .refunded }
+        billedInvoices.filter { $0.status != .paid && $0.status != .cancelled && $0.status != .refunded }
             .reduce(0) { $0 + $1.total }
     }
 
     private var overdueCount: Int {
         let now = Date()
-        return invoices.filter {
+        return billedInvoices.filter {
             $0.status != .paid && $0.status != .cancelled && $0.status != .refunded
                 && ($0.dueDate.map { $0 < now } ?? false)
         }.count
     }
 
     private var avgPaymentText: String {
-        let days = invoices.compactMap(\.paymentDays)
+        let days = billedInvoices.compactMap(\.paymentDays)
         guard !days.isEmpty else { return "—" }
         let avg = Double(days.reduce(0, +)) / Double(days.count)
         return "\(Int(avg.rounded())) \(String(localized: "dagar"))"
@@ -187,7 +191,7 @@ struct CustomerDetailView: View {
 
     private var yearly: [YearTotal] {
         let cal = Calendar.current
-        let grouped = Dictionary(grouping: invoices) { cal.component(.year, from: $0.issueDate) }
+        let grouped = Dictionary(grouping: billedInvoices) { cal.component(.year, from: $0.issueDate) }
         return grouped
             .map { YearTotal(year: $0.key, total: $0.value.reduce(0) { $0 + $1.total }) }
             .sorted { $0.year < $1.year }

@@ -41,6 +41,8 @@ struct InvoiceStrings {
 
     // Reikningsupplýsingar
     var invoiceNo: String    { en ? "Invoice no." : "Reikningur nr." }
+    var estimateNo: String   { en ? "Estimate no." : "Tilboð nr." }
+    var validUntil: String   { en ? "Valid until" : "Gildir til" }
     var creditNoteNo: String { en ? "Credit note no." : "Kreditreikningur nr." }
     var creditReason: String { en ? "For invoice no." : "Vegna reiknings nr." }
     var customerNo: String   { en ? "Customer no." : "Viðskiptanúmer" }

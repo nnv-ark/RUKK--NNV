@@ -23,6 +23,8 @@ final class Invoice {
     var bookingDate: Date?            // Bókunardagur (sjálfgefið = issueDate)
     var printedAt: Date?              // sett þegar reikningur er prentaður/fluttur út
     var paidAt: Date?                 // sett þegar staða verður „Greitt" (fyrir greiðsluhraða)
+    var isEstimate: Bool = false      // tilboð — ekki lagalegur reikningur (convertToInvoice() breytir)
+    var estimateNumber: String = ""   // tilboðsnúmer (t.d. R-T001), úthlutað við stofnun
 
     var isPrinted: Bool { printedAt != nil }
 
@@ -91,6 +93,24 @@ final class Invoice {
     /// Hefur reikningurinn fengið fast útgáfunúmer?
     var isIssued: Bool { isNumberLocked && !number.trimmingCharacters(in: .whitespaces).isEmpty }
 
+    /// Skráarheiti fyrir PDF/viðhengi: reikningsnúmer, tilboðsnúmer eða „reikningur“.
+    var documentFileName: String {
+        if !number.isEmpty { return number }
+        if isEstimate && !estimateNumber.isEmpty { return estimateNumber }
+        return "reikningur"
+    }
+
+    /// Gildistími tilboðs: sérstilltur (finalDueDate) ef settur, annars útgáfudagur + 30 dagar.
+    var validUntil: Date {
+        if let finalDueDate { return finalDueDate }
+        return Calendar.current.date(byAdding: .day, value: 30, to: issueDate) ?? issueDate
+    }
+
+    /// Ógreiddur, útgefinn reikningur sem er gjaldfallinn — áminning á við.
+    var isOverdue: Bool {
+        !isEstimate && (status == .sent || status == .overdue) && effectiveFinalDueDate < .now
+    }
+
     /// Eindagi til notkunar: sérstilltur ef settur, annars gjalddagi (eða útgáfudagur)
     /// + sjálfgildi fyrirtækis (5 dagar). Ein heimild fyrir ritil og reikningssnið.
     var effectiveFinalDueDate: Date {
@@ -141,6 +161,49 @@ final class Invoice {
         }
         context.insert(credit)
         return credit
+    }
+
+    /// Býr til tilboð (ekki lagalegan reikningur): fær eigið T-númer strax og 30 daga
+    /// gildistíma (finalDueDate, „Gildir til“). Verður að reikningi með convertToInvoice().
+    /// Tilboð brenna ekki raðnúmerum og hafa engin gatalaus-númeraskilyrði.
+    @MainActor
+    static func makeEstimate(in context: ModelContext, company: AppSettings) -> Invoice {
+        let estimate = Invoice(number: "",
+                               currencyCode: company.defaultCurrencyCode,
+                               taxRate: company.defaultTaxRate)
+        estimate.issuer = company
+        estimate.isEstimate = true
+        estimate.estimateNumber = Invoice.formattedNumber(prefix: company.invoiceNumberPrefix + "T",
+                                                          company.nextEstimateNumber)
+        company.nextEstimateNumber += 1
+        estimate.templateName = company.defaultTemplate
+        estimate.note = company.defaultNote
+        estimate.collectionMethod = company.collectionMethod
+        estimate.finalDueDate = Calendar.current.date(byAdding: .day, value: 30, to: estimate.issueDate)
+        context.insert(estimate)
+        return estimate
+    }
+
+    /// Breytir tilboði í reikningsdrög: nýr útgáfa- og bókunardagur, gjalddagi eftir
+    /// sjálfgefnum greiðslufresti fyrirtækis, tilvísun í tilboðið færð fremst í athugasemd.
+    /// Raðnúmer fæst ekki fyrr en við útgáfu (issue()) — eins og venjuleg drög.
+    @MainActor
+    func convertToInvoice() {
+        guard isEstimate else { return }
+        isEstimate = false
+        let now = Date.now
+        issueDate = now
+        bookingDate = now
+        finalDueDate = nil
+        paymentTermDays = issuer?.defaultPaymentTermDays
+        if let term = paymentTermDays {
+            dueDate = Calendar.current.date(byAdding: .day, value: term, to: now)
+        }
+        if !estimateNumber.isEmpty {
+            let ref = "Samkvæmt tilboði nr. \(estimateNumber)."
+            note = note.isEmpty ? ref : "\(ref)\n\(note)"
+        }
+        status = .draft
     }
 
     // MARK: - Computed totals

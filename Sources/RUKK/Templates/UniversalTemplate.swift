@@ -140,14 +140,20 @@ struct UniversalTemplate: View {
             }
             Spacer(minLength: 80)
             VStack(alignment: .leading, spacing: 3) {
-                metaRow(invoice.isCreditNote ? s.creditNoteNo : s.invoiceNo, invoice.number, boldLabel: true)
-                if invoice.isCreditNote && !invoice.creditedInvoiceNumber.isEmpty {
-                    metaRow(s.creditReason, invoice.creditedInvoiceNumber)
-                }
-                metaRow(s.issueDate, date(invoice.issueDate))
-                metaRow(s.dueDate, date(invoice.dueDate ?? invoice.issueDate))
-                if !invoice.collectionMethod.isEmpty {
-                    metaRow(s.collectionMethod, invoice.collectionMethod)
+                if invoice.isEstimate {
+                    metaRow(s.estimateNo, invoice.estimateNumber, boldLabel: true)
+                    metaRow(s.issueDate, date(invoice.issueDate))
+                    metaRow(s.validUntil, date(invoice.validUntil))
+                } else {
+                    metaRow(invoice.isCreditNote ? s.creditNoteNo : s.invoiceNo, invoice.number, boldLabel: true)
+                    if invoice.isCreditNote && !invoice.creditedInvoiceNumber.isEmpty {
+                        metaRow(s.creditReason, invoice.creditedInvoiceNumber)
+                    }
+                    metaRow(s.issueDate, date(invoice.issueDate))
+                    metaRow(s.dueDate, date(invoice.dueDate ?? invoice.issueDate))
+                    if !invoice.collectionMethod.isEmpty {
+                        metaRow(s.collectionMethod, invoice.collectionMethod)
+                    }
                 }
             }
             .frame(width: 260)
@@ -250,7 +256,7 @@ struct UniversalTemplate: View {
     private var footer: some View {
         HStack(alignment: .bottom) {
             Spacer()
-            Text(invoice.number).bold()
+            Text(invoice.isEstimate ? invoice.estimateNumber : invoice.number).bold()
                 .font(font(14, weight: .bold))
         }
     }

@@ -46,6 +46,7 @@ final class AppSettings {
     // Invoice numbering
     var invoiceNumberPrefix: String = ""
     var nextInvoiceNumber: Int = 1
+    var nextEstimateNumber: Int = 1      // tilboðsnúmer (forskeyti + „T“ + raðnúmer)
 
     // Útlit / leturgerð (typography & layout)
     var logoScale: Double = 1.0            // 0.5–2.0, margfaldari á logo-stærð

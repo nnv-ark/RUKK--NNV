@@ -18,6 +18,8 @@
 		3000000000000000000000E9 /* XLSXReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000E9 /* XLSXReader.swift */; };
 		3000000000000000000000EA /* CustomerImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000EA /* CustomerImport.swift */; };
 		3000000000000000000000EB /* CustomerImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000EB /* CustomerImportView.swift */; };
+		3000000000000000000000F3 /* BlizzImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F3 /* BlizzImporter.swift */; };
+		3000000000000000000000F4 /* BlizzImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F4 /* BlizzImportView.swift */; };
 		3000000000000000000000A2 /* AppSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000A2 /* AppSettings.swift */; };
 		3000000000000000000000A3 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000A3 /* Contact.swift */; };
 		3000000000000000000000A4 /* Invoice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000A4 /* Invoice.swift */; };
@@ -58,6 +60,8 @@
 		2000000000000000000000E9 /* XLSXReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XLSXReader.swift; sourceTree = "<group>"; };
 		2000000000000000000000EA /* CustomerImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerImport.swift; sourceTree = "<group>"; };
 		2000000000000000000000EB /* CustomerImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerImportView.swift; sourceTree = "<group>"; };
+		2000000000000000000000F3 /* BlizzImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlizzImporter.swift; sourceTree = "<group>"; };
+		2000000000000000000000F4 /* BlizzImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BlizzImportView.swift; sourceTree = "<group>"; };
 		2000000000000000000000E7 /* TymeImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TymeImportView.swift; sourceTree = "<group>"; };
 		2000000000000000000000A2 /* AppSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSettings.swift; sourceTree = "<group>"; };
 		2000000000000000000000A3 /* Contact.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contact.swift; sourceTree = "<group>"; };
@@ -149,6 +153,7 @@
 				2000000000000000000000E8 /* InvoiceImport.swift */,
 				2000000000000000000000E9 /* XLSXReader.swift */,
 				2000000000000000000000EA /* CustomerImport.swift */,
+				2000000000000000000000F3 /* BlizzImporter.swift */,
 				1000000000000000000000D5 /* Models */,
 				1000000000000000000000D6 /* Views */,
 				1000000000000000000000D7 /* Templates */,
@@ -186,6 +191,7 @@
 				2000000000000000000000E5 /* CalendarImportView.swift */,
 				2000000000000000000000E7 /* TymeImportView.swift */,
 				2000000000000000000000EB /* CustomerImportView.swift */,
+				2000000000000000000000F4 /* BlizzImportView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -311,6 +317,8 @@
 				3000000000000000000000E9 /* XLSXReader.swift in Sources */,
 				3000000000000000000000EA /* CustomerImport.swift in Sources */,
 				3000000000000000000000EB /* CustomerImportView.swift in Sources */,
+				3000000000000000000000F3 /* BlizzImporter.swift in Sources */,
+				3000000000000000000000F4 /* BlizzImportView.swift in Sources */,
 				3000000000000000000000A2 /* AppSettings.swift in Sources */,
 				3000000000000000000000B4 /* CustomStatus.swift in Sources */,
 				3000000000000000000000A3 /* Contact.swift in Sources */,

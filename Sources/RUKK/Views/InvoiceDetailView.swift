@@ -8,11 +8,14 @@ struct InvoiceDetailView: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \Contact.name) private var contacts: [Contact]
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
+    // Fyrir „Nota fyrri línu…“ — nýjustu reikningar fyrst.
+    @Query(sort: \Invoice.createdAt, order: .reverse) private var allInvoices: [Invoice]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
 
     @State private var isShowingPreview = true
     @State private var showingCalendarImport = false
     @State private var showingTymeImport = false
+    @State private var showingBlizzImport = false
 
     // Pure read: útgáfufyrirtæki reikningsins, annars virkt, annars transient.
     // Aldrei breytt í context meðan á view-teikningu stendur.
@@ -37,6 +40,12 @@ struct InvoiceDetailView: View {
     /// Eindagi — sjálfgefið gjalddagi + sjálfgildi fyrirtækis (5 dagar), sérstillanlegt.
     private var finalDueDateBinding: Binding<Date> {
         Binding(get: { invoice.effectiveFinalDueDate },
+                set: { invoice.finalDueDate = $0 })
+    }
+
+    /// „Gildir til“ á tilboði — sjálfgefið útgáfudagur + 30 dagar, sérstillanlegt.
+    private var validUntilBinding: Binding<Date> {
+        Binding(get: { invoice.validUntil },
                 set: { invoice.finalDueDate = $0 })
     }
 
@@ -65,11 +74,22 @@ struct InvoiceDetailView: View {
                     .frame(minWidth: 480)
             }
         }
-        .navigationTitle(invoice.number.isEmpty ? "Nýr reikningur" : invoice.number)
+        .navigationTitle(invoice.isEstimate
+                         ? (invoice.estimateNumber.isEmpty ? "Nýtt tilboð" : "Tilboð \(invoice.estimateNumber)")
+                         : (invoice.number.isEmpty ? "Nýr reikningur" : invoice.number))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Toggle(isOn: $isShowingPreview) {
                     Label("Forskoðun", systemImage: "eye")
+                }
+
+                if invoice.isOverdue {
+                    Button {
+                        PDFRenderer.emailReminder(invoice: invoice, settings: settings)
+                    } label: {
+                        Label("Senda áminningu", systemImage: "bell")
+                    }
+                    .help("Semja áminningu í Mail vegna gjaldfallins reiknings")
                 }
 
                 Button {
@@ -78,8 +98,8 @@ struct InvoiceDetailView: View {
                 } label: {
                     Label("Prenta…", systemImage: "printer")
                 }
-                .disabled(invoice.number.isEmpty)
-                .help(invoice.number.isEmpty ? "Gefðu reikninginn út áður en hann er prentaður" : "")
+                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
+                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er prentaður" : "")
 
                 Button {
                     PDFRenderer.emailInvoice(invoice: invoice, settings: settings)
@@ -87,8 +107,8 @@ struct InvoiceDetailView: View {
                 } label: {
                     Label("Senda í tölvupósti", systemImage: "envelope")
                 }
-                .disabled(invoice.number.isEmpty)
-                .help(invoice.number.isEmpty ? "Gefðu reikninginn út áður en hann er sendur" : "Senda reikning í tölvupósti með PDF")
+                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
+                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er sendur" : "Senda í tölvupósti með PDF")
 
                 Menu {
                     Button("Opna í Preview") {
@@ -98,8 +118,10 @@ struct InvoiceDetailView: View {
                         PDFRenderer.export(invoice: invoice, settings: settings)
                         invoice.printedAt = .now
                     }
-                    Button("Rafrænn reikningur (UBL / TS-136)…") {
-                        UBLInvoiceExporter.export(invoice: invoice, company: settings)
+                    if !invoice.isEstimate {
+                        Button("Rafrænn reikningur (UBL / TS-136)…") {
+                            UBLInvoiceExporter.export(invoice: invoice, company: settings)
+                        }
                     }
                     Divider()
                     Button("Síðuuppsetning…") {
@@ -112,8 +134,8 @@ struct InvoiceDetailView: View {
                 } label: {
                     Label("Flytja út", systemImage: "square.and.arrow.up")
                 }
-                .disabled(invoice.number.isEmpty)
-                .help(invoice.number.isEmpty ? "Gefðu reikninginn út áður en hann er fluttur út" : "")
+                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
+                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er fluttur út" : "")
             }
         }
         .focusedSceneValue(\.printInvoice) {
@@ -125,7 +147,10 @@ struct InvoiceDetailView: View {
             invoice.printedAt = .now
         }
         .focusedSceneValue(\.exportXML) {
-            UBLInvoiceExporter.export(invoice: invoice, company: settings)
+            // Rafrænir reikningar (UBL / TS-136) eru aðeins fyrir lagalega reikninga.
+            if !invoice.isEstimate {
+                UBLInvoiceExporter.export(invoice: invoice, company: settings)
+            }
         }
         .sheet(isPresented: $showingCalendarImport) {
             CalendarImportView(invoice: invoice)
@@ -133,31 +158,41 @@ struct InvoiceDetailView: View {
         .sheet(isPresented: $showingTymeImport) {
             TymeImportView(invoice: invoice)
         }
+        .sheet(isPresented: $showingBlizzImport) {
+            BlizzImportView(invoice: invoice)
+        }
     }
 
     private var form: some View {
         Form {
-            Section("Reikningur") {
-                HStack {
-                    TextField("Númer", text: $invoice.number, prompt: Text("úthlutað við útgáfu"))
-                        .disabled(invoice.isNumberLocked)
-                        .foregroundStyle(invoice.isNumberLocked ? .secondary : .primary)
-                    if !invoice.number.isEmpty {
-                        Button {
-                            invoice.isNumberLocked.toggle()
-                        } label: {
-                            Image(systemName: invoice.isNumberLocked ? "lock.fill" : "lock.open")
+            Section(invoice.isEstimate ? "Tilboð" : "Reikningur") {
+                if invoice.isEstimate {
+                    // Tilboð fá T-númer við stofnun — ekki breytilegt, engin læsing.
+                    LabeledContent("Númer", value: invoice.estimateNumber)
+                    DatePicker("Útgáfudagur", selection: $invoice.issueDate, displayedComponents: .date)
+                    DatePicker("Gildir til", selection: validUntilBinding, displayedComponents: .date)
+                } else {
+                    HStack {
+                        TextField("Númer", text: $invoice.number, prompt: Text("úthlutað við útgáfu"))
+                            .disabled(invoice.isNumberLocked)
+                            .foregroundStyle(invoice.isNumberLocked ? .secondary : .primary)
+                        if !invoice.number.isEmpty {
+                            Button {
+                                invoice.isNumberLocked.toggle()
+                            } label: {
+                                Image(systemName: invoice.isNumberLocked ? "lock.fill" : "lock.open")
+                            }
+                            .buttonStyle(.borderless)
+                            .help(invoice.isNumberLocked ? "Aflæsa númeri" : "Festa númer")
                         }
-                        .buttonStyle(.borderless)
-                        .help(invoice.isNumberLocked ? "Aflæsa númeri" : "Festa númer")
                     }
+                    DatePicker("Útgáfudagur", selection: $invoice.issueDate, displayedComponents: .date)
+                        .disabled(invoice.isNumberLocked)
+                    DatePicker("Gjalddagi", selection: dueDateBinding, displayedComponents: .date)
+                        .disabled(invoice.isNumberLocked)
+                    DatePicker("Eindagi", selection: finalDueDateBinding, displayedComponents: .date)
+                        .disabled(invoice.isNumberLocked)
                 }
-                DatePicker("Útgáfudagur", selection: $invoice.issueDate, displayedComponents: .date)
-                    .disabled(invoice.isNumberLocked)
-                DatePicker("Gjalddagi", selection: dueDateBinding, displayedComponents: .date)
-                    .disabled(invoice.isNumberLocked)
-                DatePicker("Eindagi", selection: finalDueDateBinding, displayedComponents: .date)
-                    .disabled(invoice.isNumberLocked)
                 Picker("Staða", selection: $invoice.status) {
                     ForEach(InvoiceStatus.allCases) { Text($0.label).tag($0) }
                 }
@@ -166,18 +201,33 @@ struct InvoiceDetailView: View {
                     Text("Universal (enska)").tag("universal")
                 }
                 .disabled(invoice.isNumberLocked)
-                if invoice.status == .paid {
-                    DatePicker("Greitt þann",
-                               selection: Binding(
-                                get: { invoice.paidAt ?? invoice.issueDate },
-                                set: { invoice.paidAt = $0 }),
-                               displayedComponents: .date)
-                } else {
-                    Button("Merkja sem greitt") { invoice.status = .paid }
+                if !invoice.isEstimate {
+                    if invoice.status == .paid {
+                        DatePicker("Greitt þann",
+                                   selection: Binding(
+                                    get: { invoice.paidAt ?? invoice.issueDate },
+                                    set: { invoice.paidAt = $0 }),
+                                   displayedComponents: .date)
+                    } else {
+                        Button("Merkja sem greitt") { invoice.status = .paid }
+                    }
                 }
             }
 
-            if !invoice.isIssued {
+            if invoice.isEstimate {
+                Section {
+                    Button {
+                        invoice.convertToInvoice()
+                    } label: {
+                        Label("Breyta í reikning", systemImage: "arrow.right.doc.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                } footer: {
+                    Text("Viðskiptavinur samþykkti? Tilboðið verður að venjulegum reikningadrögum — raðnúmer fæst við útgáfu.")
+                }
+            } else if !invoice.isIssued {
                 Section {
                     Button {
                         invoice.issue()
@@ -244,6 +294,16 @@ struct InvoiceDetailView: View {
                 } label: {
                     Label("Bæta við línu", systemImage: "plus")
                 }
+                if !lineHistory.isEmpty {
+                    Menu {
+                        ForEach(lineHistory, id: \.self) { entry in
+                            Button(entry.description) { insertLine(from: entry) }
+                        }
+                    } label: {
+                        Label("Nota fyrri línu…", systemImage: "clock.arrow.circlepath")
+                    }
+                    .help("Bætir við línu með lýsingu, verði og VSK úr eldri reikningum")
+                }
                 Button {
                     showingCalendarImport = true
                 } label: {
@@ -253,6 +313,11 @@ struct InvoiceDetailView: View {
                     showingTymeImport = true
                 } label: {
                     Label("Sækja úr Tyme", systemImage: "clock")
+                }
+                Button {
+                    showingBlizzImport = true
+                } label: {
+                    Label("Sækja úr BLIZZ", systemImage: "snowflake")
                 }
             }
             .disabled(invoice.isNumberLocked)
@@ -299,6 +364,38 @@ struct InvoiceDetailView: View {
     private func deleteItems(at offsets: IndexSet) {
         let items = invoice.orderedItems
         for i in offsets { context.delete(items[i]) }
+    }
+
+    /// Ein eldri lína úr reikningssögu fyrirtækisins — fyrir „Nota fyrri línu…“.
+    private struct HistoricLine: Hashable {
+        let description: String
+        let unitPrice: Decimal
+        let taxRate: Decimal
+    }
+
+    /// Nýjustu ólíkar línulýsingar fyrirtækisins (nýjustu fyrst, hámark 15).
+    private var lineHistory: [HistoricLine] {
+        let sid = (invoice.issuer ?? settings).id
+        var seen = Set<String>()
+        var result: [HistoricLine] = []
+        for inv in allInvoices where inv.issuer?.id == sid && inv !== invoice {
+            for item in inv.orderedItems {
+                let d = item.itemDescription.trimmingCharacters(in: .whitespaces)
+                guard !d.isEmpty, seen.insert(d).inserted else { continue }
+                result.append(HistoricLine(description: d, unitPrice: item.unitPrice, taxRate: item.taxRate))
+                if result.count == 15 { return result }
+            }
+        }
+        return result
+    }
+
+    private func insertLine(from entry: HistoricLine) {
+        let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
+        let item = LineItem(description: entry.description, quantity: 1,
+                            unitPrice: entry.unitPrice, taxRate: entry.taxRate, order: next)
+        item.invoice = invoice
+        invoice.lineItems.append(item)
+        context.insert(item)
     }
 
     private func move(item: LineItem, by delta: Int) {

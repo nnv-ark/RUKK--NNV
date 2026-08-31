@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 enum SidebarItem: Hashable {
     case dashboard
     case invoices
+    case estimates
     case contacts
 }
 
@@ -40,6 +41,8 @@ struct ContentView: View {
                 Section("Bókasafn") {
                     Label("Reikningar", systemImage: "doc.text")
                         .tag(SidebarItem.invoices)
+                    Label("Tilboð", systemImage: "doc.append")
+                        .tag(SidebarItem.estimates)
                     Label("Viðskiptavinir", systemImage: "person.2")
                         .tag(SidebarItem.contacts)
                 }
@@ -61,6 +64,9 @@ struct ContentView: View {
                 case .invoices, .none:
                     InvoiceListView(company: company, selection: $selectedInvoice)
                         .id(company.id)               // ný fyrirspurn þegar skipt er um fyrirtæki
+                case .estimates:
+                    InvoiceListView(company: company, selection: $selectedInvoice, estimatesOnly: true)
+                        .id(company.id)
                 case .contacts:
                     ContactsView(company: company, selection: $selectedContact, onImport: beginCustomerImport)
                         .id(company.id)
@@ -123,6 +129,7 @@ struct ContentView: View {
             if let payload = inbox.pending { importInvoice(payload) }
         }
         .focusedSceneValue(\.newInvoice, createInvoice)
+        .focusedSceneValue(\.newEstimate, createEstimate)
         .focusedSceneValue(\.importCustomers, beginCustomerImport)
         .fileImporter(isPresented: $showingCustomerImporter,
                       allowedContentTypes: customerImportTypes,
@@ -199,11 +206,12 @@ struct ContentView: View {
             }
         }
 
-        // 2) Endurnúmera hvert fyrirtæki sjálfstætt.
+        // 2) Endurnúmera hvert fyrirtæki sjálfstætt (tilboð eru undanskilin —
+        //    þau eiga ekki í gatalausri reikningsröðinni).
         for company in AppSettings.all(in: context) {
             let cid = company.id
             let invs = (try? context.fetch(FetchDescriptor<Invoice>(
-                predicate: #Predicate { $0.issuer?.id == cid },
+                predicate: #Predicate { $0.issuer?.id == cid && !$0.isEstimate },
                 sortBy: [SortDescriptor(\.createdAt)]))) ?? []
             for (i, inv) in invs.enumerated() {
                 inv.number = Invoice.formattedNumber(prefix: company.invoiceNumberPrefix, i + 1)
@@ -219,10 +227,22 @@ struct ContentView: View {
         selectedInvoice = invoice
     }
 
-    /// Býr til drög-reikning úr gögnum sem bárust um `rukk://` (t.d. úr Tyme-viðbót) og opnar hann.
+    /// Býr til nýtt tilboð fyrir virkt fyrirtæki og opnar það í Tilboða-flipanum.
+    private func createEstimate() {
+        let company = AppSettings.active(in: context, activeID: activeCompanyID)
+        let estimate = Invoice.makeEstimate(in: context, company: company)
+        selection = .estimates
+        selectedInvoice = estimate
+    }
+
+    /// Býr til drög-reikning — eða tilboð ef sendingin biður um það (`estimate: true`) —
+    /// úr gögnum sem bárust utanfrá (`rukk://` slóð eða `.rukktime` skrá úr BLIZZ) og opnar þau.
     private func importInvoice(_ payload: InvoiceImportPayload) {
         let company = AppSettings.active(in: context, activeID: activeCompanyID)
-        let invoice = Invoice.makeNext(in: context, company: company)
+        let isEstimate = payload.estimate == true
+        let invoice = isEstimate
+            ? Invoice.makeEstimate(in: context, company: company)
+            : Invoice.makeNext(in: context, company: company)
         if let customer = payload.customer?.trimmingCharacters(in: .whitespacesAndNewlines),
            !customer.isEmpty {
             invoice.note = "Verkefni: \(customer)"
@@ -237,7 +257,7 @@ struct ContentView: View {
             invoice.lineItems.append(item)
             context.insert(item)
         }
-        selection = .invoices
+        selection = isEstimate ? .estimates : .invoices
         selectedInvoice = invoice
         inbox.pending = nil
     }

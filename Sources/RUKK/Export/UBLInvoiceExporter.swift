@@ -59,6 +59,8 @@ enum UBLInvoiceExporter {
     }
 
     static func export(invoice: Invoice, company: AppSettings) {
+        // UBL / TS-136 á aðeins við lagalega reikninga — aldrei tilboð.
+        guard !invoice.isEstimate else { NSSound.beep(); return }
         let content = xml(for: invoice, company: company)
 
         let panel = NSSavePanel()

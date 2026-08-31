@@ -40,8 +40,7 @@ enum PDFRenderer {
     /// Semur tölvupóst í Mail með PDF reikningsins sem viðhengi (notandi sendir sjálfur).
     static func emailInvoice(invoice: Invoice, settings: AppSettings) {
         guard let data = pdfData(invoice: invoice, settings: settings) else { NSSound.beep(); return }
-        let safeName = invoice.number.isEmpty ? "reikningur" : invoice.number
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(safeName).pdf")
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(invoice.documentFileName).pdf")
         do {
             try data.write(to: url)
         } catch {
@@ -53,20 +52,55 @@ enum PDFRenderer {
             NSSound.beep(); return
         }
         // Notar sniðmátið úr Stillingum ({nafn}, {númer}, {fyrirtæki} útfyllt sjálfkrafa).
+        // Tilboð fá sérstakan viðfangslínu-texta — þau eru ekki reikningar.
         let fields = settings.emailFields(for: invoice)
-        service.subject = fields.subject
+        service.subject = invoice.isEstimate
+            ? "Tilboð \(invoice.estimateNumber) frá \(settings.displayName)"
+            : fields.subject
         if let email = invoice.recipient?.email, !email.isEmpty {
             service.recipients = [email]
         }
         service.perform(withItems: [fields.body, url])
     }
 
+    /// Semur vænlega áminningu í Mail vegna ógreidds, gjaldfallins reiknings — PDF fylgir.
+    static func emailReminder(invoice: Invoice, settings: AppSettings) {
+        guard let data = pdfData(invoice: invoice, settings: settings) else { NSSound.beep(); return }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("\(invoice.documentFileName).pdf")
+        do {
+            try data.write(to: url)
+        } catch {
+            pdfLog.error("Failed to write PDF for reminder: \(error, privacy: .public)")
+            NSSound.beep(); return
+        }
+
+        guard let service = NSSharingService(named: .composeEmail) else {
+            NSSound.beep(); return
+        }
+        service.subject = "Áminning: Reikningur nr. \(invoice.number) frá \(settings.displayName)"
+        if let email = invoice.recipient?.email, !email.isEmpty {
+            service.recipients = [email]
+        }
+        let due = invoice.effectiveFinalDueDate.formatted(date: .numeric, time: .omitted)
+        let body = """
+        Kæri viðskiptavinur,
+
+        Þetta er vænleg áminning vegna reiknings nr. \(invoice.number) sem galdyfellti \(due). Reikningurinn fylgir meðfylgjandi.
+
+        Vinsamlegast hafið samband ef spurningar vakna.
+
+        Kveðja,
+
+        \(settings.displayName)
+        """
+        service.perform(withItems: [body, url])
+    }
+
     /// Opnar reikninginn í sjálfgefnu PDF-forriti (Preview).
     static func openInPreview(invoice: Invoice, settings: AppSettings) {
         guard let data = pdfData(invoice: invoice, settings: settings) else { NSSound.beep(); return }
-        let safeName = invoice.number.isEmpty ? "reikningur" : invoice.number
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(safeName).pdf")
+            .appendingPathComponent("\(invoice.documentFileName).pdf")
         do {
             try data.write(to: url)
             NSWorkspace.shared.open(url)
@@ -102,8 +136,7 @@ enum PDFRenderer {
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.pdf]
-        let safeName = invoice.number.isEmpty ? "invoice" : invoice.number
-        panel.nameFieldStringValue = "\(safeName).pdf"
+        panel.nameFieldStringValue = "\(invoice.documentFileName).pdf"
         panel.canCreateDirectories = true
 
         guard panel.runModal() == .OK, let url = panel.url else { return }

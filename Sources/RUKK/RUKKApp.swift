@@ -71,7 +71,8 @@ struct RUKKApp: App {
 /// Sýnir aðalviðmótið ef áskrift er virk, annars áskriftarskjáinn.
 struct RootView: View {
     @State private var subscriptions = SubscriptionStore()
-    /// Reikningur sem berst utanfrá um `rukk://` (t.d. úr Tyme) bíður hér uns viðmótið er tilbúið.
+    /// Reikningur sem berst utanfrá — um `rukk://` slóð (t.d. úr Tyme) eða `.rukktime`
+    /// skrá (bein sending úr BLIZZ) — bíður hér uns viðmótið er tilbúið.
     @State private var inbox = ImportInbox()
     /// DEBUG-only: leyfir að sleppa paywall við prófun (aldrei lesið í App Store-byggingum).
     @AppStorage("debugUnlocked") private var debugUnlocked = false
@@ -127,6 +128,7 @@ struct RootView: View {
 
 struct RUKKCommands: Commands {
     @FocusedValue(\.newInvoice) private var newInvoice
+    @FocusedValue(\.newEstimate) private var newEstimate
     @FocusedValue(\.printInvoice) private var printInvoice
     @FocusedValue(\.exportPDF) private var exportPDF
     @FocusedValue(\.exportXML) private var exportXML
@@ -137,6 +139,9 @@ struct RUKKCommands: Commands {
             Button("Nýr reikningur") { newInvoice?() }
                 .keyboardShortcut("n", modifiers: .command)
                 .disabled(newInvoice == nil)
+            Button("Nýtt tilboð") { newEstimate?() }
+                .keyboardShortcut("n", modifiers: [.command, .option])
+                .disabled(newEstimate == nil)
         }
         CommandGroup(replacing: .importExport) {
             Button("Flytja inn viðskiptavini…") { importCustomers?() }

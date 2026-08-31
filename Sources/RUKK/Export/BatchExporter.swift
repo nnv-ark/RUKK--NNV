@@ -10,7 +10,9 @@ enum BatchExporter {
 
     enum Format { case pdf, xml, both }
 
-    static func exportAll(_ invoices: [Invoice], company: AppSettings, format: Format = .both) {
+    static func exportAll(_ all: [Invoice], company: AppSettings, format: Format = .both) {
+        // Tilboð eru ekki lagaleg skjöl — sleppa þeim í magnútflutningi.
+        let invoices = all.filter { !$0.isEstimate }
         guard !invoices.isEmpty else { NSSound.beep(); return }
 
         let panel = NSOpenPanel()

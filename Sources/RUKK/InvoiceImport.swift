@@ -13,12 +13,20 @@ struct InvoiceImportPayload: Codable, Equatable {
     var source: String?          // t.d. "tyme"
     var currency: String?        // t.d. "ISK"
     var customer: String?        // verkefnaheiti úr upprunanum (valkvætt)
+    var estimate: Bool?          // true = búa til tilboð í stað reikningsdraga (BLIZZ „Senda tilboð“)
     var lines: [Line]
 }
 
-/// Les `rukk://invoice?data=<base64 JSON>` slóðir og afkóðar í `InvoiceImportPayload`.
+/// Les tvær gerðir af innflutningi í `InvoiceImportPayload`:
+/// - `rukk://invoice?data=<base64 JSON>` slóðir (t.d. úr Tyme-viðbót)
+/// - `.rukktime` skrár sem RUKK er beðið um að opna (bein „Send to RUKK“ sending úr BLIZZ).
+///   Skrár sem berast um LaunchServices („opna með“) fá sandkassaleyfi sjálfkrafa.
 enum InvoiceImport {
     static func payload(from url: URL) -> InvoiceImportPayload? {
+        if url.isFileURL {
+            guard let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(InvoiceImportPayload.self, from: data)
+        }
         guard url.scheme?.lowercased() == "rukk" else { return nil }
         guard let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
               let encoded = comps.queryItems?.first(where: { $0.name == "data" })?.value,

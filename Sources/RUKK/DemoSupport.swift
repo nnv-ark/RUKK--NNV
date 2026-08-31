@@ -91,6 +91,23 @@ enum Demo {
                 items: [("Vörusíða", 1, 410000), ("SEO-úttekt", 1, 95000)])
         a.nextInvoiceNumber = 9
 
+        // Sýni-tilboð (opin fyrir „Breyta í reikning“).
+        let est = Invoice(number: "", currencyCode: "ISK", taxRate: 24)
+        est.issuer = a
+        est.recipient = marel
+        est.isEstimate = true
+        est.estimateNumber = a.invoiceNumberPrefix + "T001"
+        est.issueDate = day(2026, 8, 18)
+        est.createdAt = est.issueDate
+        est.finalDueDate = cal.date(byAdding: .day, value: 30, to: est.issueDate)
+        est.note = "Gildir í 30 daga. Verð miðast við vinnufjölda hér að ofan."
+        let estLi1 = LineItem(description: "UI/UX ráðgjöf", quantity: 30, unitPrice: 18500, taxRate: 24, order: 0)
+        estLi1.invoice = est; est.lineItems.append(estLi1); context.insert(estLi1)
+        let estLi2 = LineItem(description: "Frumgerð í Figma", quantity: 1, unitPrice: 240000, taxRate: 24, order: 1)
+        estLi2.invoice = est; est.lineItems.append(estLi2); context.insert(estLi2)
+        context.insert(est)
+        a.nextEstimateNumber = 2
+
         // MARK: Fyrirtæki B — Verkfræðistofan Berg ehf.
         let b = AppSettings()
         b.companyName = "Verkfræðistofan Berg ehf."

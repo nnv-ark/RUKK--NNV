@@ -138,7 +138,8 @@ struct DashboardView: View {
         Calendar.current.date(byAdding: .month, value: -12, to: Date()) ?? .distantPast
     }
     private var period: [Invoice] {
-        invoices.filter { $0.issueDate >= periodStart && $0.status != .cancelled }
+        // Tilboð eru ekki sala — undanskilin öllum sölutölum mælaborðsins.
+        invoices.filter { !$0.isEstimate && $0.issueDate >= periodStart && $0.status != .cancelled }
     }
     private var total12: Decimal { period.reduce(0) { $0 + $1.total } }
     private var collected12: Decimal { period.filter { $0.status == .paid }.reduce(0) { $0 + $1.total } }
@@ -163,7 +164,7 @@ struct DashboardView: View {
     }
 
     private var unpaid: [Invoice] {
-        invoices.filter { $0.status != .paid && $0.status != .cancelled && $0.status != .refunded }
+        invoices.filter { !$0.isEstimate && $0.status != .paid && $0.status != .cancelled && $0.status != .refunded }
             .sorted { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
     }
 

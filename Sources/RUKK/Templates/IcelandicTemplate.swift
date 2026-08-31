@@ -141,16 +141,24 @@ struct IcelandicTemplate: View {
             }
             Spacer(minLength: 80)
             VStack(alignment: .leading, spacing: 3) {
-                metaRow(invoice.isCreditNote ? s.creditNoteNo : s.invoiceNo, invoice.number, boldLabel: true)
-                if invoice.isCreditNote && !invoice.creditedInvoiceNumber.isEmpty {
-                    metaRow(s.creditReason, invoice.creditedInvoiceNumber)
+                if invoice.isEstimate {
+                    // Tilboð: eigið T-númer og gildistími — engir gjalddagar/eindagar.
+                    metaRow(s.estimateNo, invoice.estimateNumber, boldLabel: true)
+                    metaRow(s.customerNo, invoice.recipient?.nationalID ?? "")
+                    metaRow(s.issueDate, date(invoice.issueDate))
+                    metaRow(s.validUntil, date(invoice.validUntil))
+                } else {
+                    metaRow(invoice.isCreditNote ? s.creditNoteNo : s.invoiceNo, invoice.number, boldLabel: true)
+                    if invoice.isCreditNote && !invoice.creditedInvoiceNumber.isEmpty {
+                        metaRow(s.creditReason, invoice.creditedInvoiceNumber)
+                    }
+                    metaRow(s.customerNo, invoice.recipient?.nationalID ?? "")
+                    metaRow(s.issueDate, date(invoice.issueDate))
+                    metaRow(s.bookingDate, date(invoice.bookingDate ?? invoice.issueDate))
+                    metaRow(s.dueDate, date(invoice.dueDate ?? invoice.issueDate))
+                    metaRow(s.finalDueDate, date(invoice.effectiveFinalDueDate))
+                    metaRow(s.collectionMethod, invoice.collectionMethod)
                 }
-                metaRow(s.customerNo, invoice.recipient?.nationalID ?? "")
-                metaRow(s.issueDate, date(invoice.issueDate))
-                metaRow(s.bookingDate, date(invoice.bookingDate ?? invoice.issueDate))
-                metaRow(s.dueDate, date(invoice.dueDate ?? invoice.issueDate))
-                metaRow(s.finalDueDate, date(invoice.effectiveFinalDueDate))
-                metaRow(s.collectionMethod, invoice.collectionMethod)
             }
             .frame(width: 260)
         }
@@ -261,10 +269,13 @@ struct IcelandicTemplate: View {
 
     private var footer: some View {
         HStack(alignment: .bottom) {
-            Text(s.footerLegal)
-                .fixedSize(horizontal: false, vertical: true)
+            if !invoice.isEstimate {
+                // Lagatilvísun (505/2013) á aðeins við reikninga — ekki tilboð.
+                Text(s.footerLegal)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             Spacer(minLength: 16)
-            Text(invoice.number).bold()
+            Text(invoice.isEstimate ? invoice.estimateNumber : invoice.number).bold()
                 .font(font(14, weight: .bold))
         }
     }

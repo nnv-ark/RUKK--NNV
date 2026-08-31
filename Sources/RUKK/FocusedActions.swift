@@ -4,6 +4,7 @@ import SwiftUI
 // Skilgreint hér (í safninu) svo bæði view-in og App-skipanirnar sjái þær.
 
 struct NewInvoiceAction: FocusedValueKey { typealias Value = () -> Void }
+struct NewEstimateAction: FocusedValueKey { typealias Value = () -> Void }
 struct PrintInvoiceAction: FocusedValueKey { typealias Value = () -> Void }
 struct ExportPDFAction: FocusedValueKey { typealias Value = () -> Void }
 struct ExportXMLAction: FocusedValueKey { typealias Value = () -> Void }
@@ -12,6 +13,9 @@ struct ImportCustomersAction: FocusedValueKey { typealias Value = () -> Void }
 extension FocusedValues {
     var newInvoice: (() -> Void)? {
         get { self[NewInvoiceAction.self] } set { self[NewInvoiceAction.self] = newValue }
+    }
+    var newEstimate: (() -> Void)? {
+        get { self[NewEstimateAction.self] } set { self[NewEstimateAction.self] = newValue }
     }
     var importCustomers: (() -> Void)? {
         get { self[ImportCustomersAction.self] } set { self[ImportCustomersAction.self] = newValue }

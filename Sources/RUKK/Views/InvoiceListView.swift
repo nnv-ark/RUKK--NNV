@@ -7,13 +7,16 @@ struct InvoiceListView: View {
     @Binding var selection: Invoice?
 
     private let company: AppSettings
+    /// Sýnir tilboð (isEstimate) í stað reikninga — sama viðmót, annar gagnahópur.
+    private let estimatesOnly: Bool
 
-    init(company: AppSettings, selection: Binding<Invoice?>) {
+    init(company: AppSettings, selection: Binding<Invoice?>, estimatesOnly: Bool = false) {
         self.company = company
+        self.estimatesOnly = estimatesOnly
         _selection = selection
         let cid = company.id
         _invoices = Query(
-            filter: #Predicate<Invoice> { $0.issuer?.id == cid },
+            filter: #Predicate<Invoice> { $0.issuer?.id == cid && $0.isEstimate == estimatesOnly },
             sort: [SortDescriptor(\Invoice.createdAt, order: .reverse)]
         )
     }
@@ -24,6 +27,10 @@ struct InvoiceListView: View {
                 InvoiceRow(invoice: invoice)
                     .tag(invoice)
                     .contextMenu {
+                        if invoice.isEstimate {
+                            Button("Breyta í reikning") { invoice.convertToInvoice() }
+                            Divider()
+                        }
                         Button("Prenta…") {
                             PDFRenderer.printInvoice(invoice: invoice, settings: invoice.issuer ?? currentSettings())
                             invoice.printedAt = .now
@@ -31,6 +38,11 @@ struct InvoiceListView: View {
                         Button("Senda í tölvupósti…") {
                             PDFRenderer.emailInvoice(invoice: invoice, settings: invoice.issuer ?? currentSettings())
                             invoice.printedAt = .now
+                        }
+                        if invoice.isOverdue {
+                            Button("Senda áminningu…") {
+                                PDFRenderer.emailReminder(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                            }
                         }
                         Button("Opna í Preview") {
                             PDFRenderer.openInPreview(invoice: invoice, settings: invoice.issuer ?? currentSettings())
@@ -51,8 +63,10 @@ struct InvoiceListView: View {
                             PDFRenderer.export(invoice: invoice, settings: invoice.issuer ?? currentSettings())
                             invoice.printedAt = .now
                         }
-                        Button("Flytja út XML (TS-136)…") {
-                            UBLInvoiceExporter.export(invoice: invoice, company: invoice.issuer ?? currentSettings())
+                        if !invoice.isEstimate {
+                            Button("Flytja út XML (TS-136)…") {
+                                UBLInvoiceExporter.export(invoice: invoice, company: invoice.issuer ?? currentSettings())
+                            }
                         }
                         Divider()
                         Button("Eyða", role: .destructive) { context.delete(invoice) }
@@ -60,31 +74,33 @@ struct InvoiceListView: View {
             }
             .onDelete(perform: delete)
         }
-        .navigationTitle("Reikningar")
+        .navigationTitle(estimatesOnly ? "Tilboð" : "Reikningar")
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack(spacing: 8) {
                 Button(action: createInvoice) {
-                    Label("Nýr reikningur", systemImage: "plus")
+                    Label(estimatesOnly ? "Nýtt tilboð" : "Nýr reikningur", systemImage: "plus")
                         .lineLimit(1)
                 }
                 .fixedSize()
-                .help("Nýr reikningur")
+                .help(estimatesOnly ? "Nýtt tilboð" : "Nýr reikningur")
 
                 Spacer()
 
-                Menu {
-                    Button("PDF + XML…") { BatchExporter.exportAll(invoices, company: company, format: .both) }
-                    Button("Aðeins PDF…") { BatchExporter.exportAll(invoices, company: company, format: .pdf) }
-                    Button("Aðeins XML…") { BatchExporter.exportAll(invoices, company: company, format: .xml) }
-                } label: {
-                    Label("Flytja út alla", systemImage: "square.and.arrow.up.on.square")
-                        .labelStyle(.iconOnly)
+                if !estimatesOnly {
+                    Menu {
+                        Button("PDF + XML…") { BatchExporter.exportAll(invoices, company: company, format: .both) }
+                        Button("Aðeins PDF…") { BatchExporter.exportAll(invoices, company: company, format: .pdf) }
+                        Button("Aðeins XML…") { BatchExporter.exportAll(invoices, company: company, format: .xml) }
+                    } label: {
+                        Label("Flytja út alla", systemImage: "square.and.arrow.up.on.square")
+                            .labelStyle(.iconOnly)
+                    }
+                    .menuStyle(.borderlessButton)
+                    .menuIndicator(.hidden)
+                    .fixedSize()
+                    .help("Flytja út alla reikninga")
+                    .disabled(invoices.isEmpty)
                 }
-                .menuStyle(.borderlessButton)
-                .menuIndicator(.hidden)
-                .fixedSize()
-                .help("Flytja út alla reikninga")
-                .disabled(invoices.isEmpty)
             }
             .buttonStyle(.borderless)
             .padding(.horizontal, 12)
@@ -97,7 +113,9 @@ struct InvoiceListView: View {
     private func currentSettings() -> AppSettings { company }
 
     private func createInvoice() {
-        let invoice = Invoice.makeNext(in: context, company: currentSettings())
+        let invoice = estimatesOnly
+            ? Invoice.makeEstimate(in: context, company: currentSettings())
+            : Invoice.makeNext(in: context, company: currentSettings())
         selection = invoice
     }
 
@@ -107,7 +125,7 @@ struct InvoiceListView: View {
 
     private func duplicate(_ src: Invoice) {
         let s = currentSettings()
-        let copy = Invoice(number: Invoice.formattedNumber(prefix: s.invoiceNumberPrefix, s.nextInvoiceNumber),
+        let copy = Invoice(number: src.isEstimate ? "" : Invoice.formattedNumber(prefix: s.invoiceNumberPrefix, s.nextInvoiceNumber),
                            currencyCode: src.currencyCode,
                            taxRate: src.taxRate)
         copy.issuer = src.issuer ?? s
@@ -117,7 +135,13 @@ struct InvoiceListView: View {
         copy.discountAmount = src.discountAmount
         copy.isTaxInclusive = src.isTaxInclusive
         copy.paymentTermDays = src.paymentTermDays
-        if let term = copy.paymentTermDays {
+        if src.isEstimate {
+            // Afrit tilboðs: nýtt T-númer og nýr 30 daga gildistími.
+            copy.isEstimate = true
+            copy.estimateNumber = Invoice.formattedNumber(prefix: s.invoiceNumberPrefix + "T", s.nextEstimateNumber)
+            s.nextEstimateNumber += 1
+            copy.finalDueDate = Calendar.current.date(byAdding: .day, value: 30, to: copy.issueDate)
+        } else if let term = copy.paymentTermDays {
             copy.dueDate = Calendar.current.date(byAdding: .day, value: term, to: copy.issueDate)
         }
         context.insert(copy)
@@ -131,7 +155,7 @@ struct InvoiceListView: View {
             copy.lineItems.append(li)
             context.insert(li)
         }
-        s.nextInvoiceNumber += 1
+        if !src.isEstimate { s.nextInvoiceNumber += 1 }
         selection = copy
     }
 }
@@ -146,7 +170,9 @@ private struct InvoiceRow: View {
                 .frame(width: 8, height: 8)
                 .help(invoice.isPrinted ? "Prentaður" : "")
             VStack(alignment: .leading, spacing: 2) {
-                Text(invoice.number.isEmpty ? "(ekkert númer)" : invoice.number)
+                Text(invoice.isEstimate
+                     ? (invoice.estimateNumber.isEmpty ? "(ekkert númer)" : invoice.estimateNumber)
+                     : (invoice.number.isEmpty ? "(ekkert númer)" : invoice.number))
                     .font(.headline)
                 Text(invoice.recipient?.name ?? "Enginn móttakandi")
                     .font(.subheadline)
