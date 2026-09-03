@@ -26,7 +26,9 @@ enum PDFRenderer {
         guard let data = pdfData(invoice: invoice, settings: settings),
               let doc = PDFDocument(data: data) else { NSSound.beep(); return }
 
-        let info = NSPrintInfo.shared
+        // Afrit — annars stæði stillingin eftir í sameiginlegu NSPrintInfo og hefði
+        // áhrif á Síðuuppsetningu og næstu prentun.
+        let info = NSPrintInfo(dictionary: NSPrintInfo.shared.dictionary() as! [NSPrintInfo.AttributeKey: Any])
         info.horizontalPagination = .fit
         info.verticalPagination = .fit
         guard let op = doc.printOperation(for: info, scalingMode: .pageScaleToFit, autoRotate: false) else {
@@ -85,7 +87,7 @@ enum PDFRenderer {
         let body = """
         Kæri viðskiptavinur,
 
-        Þetta er vænleg áminning vegna reiknings nr. \(invoice.number) sem galdyfellti \(due). Reikningurinn fylgir meðfylgjandi.
+        Þetta er vinsamleg áminning vegna reiknings nr. \(invoice.number) sem gjaldféll \(due). Reikningurinn fylgir meðfylgjandi.
 
         Vinsamlegast hafið samband ef spurningar vakna.
 

@@ -15,12 +15,17 @@ enum XLSXReader {
         case notAZip
         case noWorksheet
         case inflateFailed(String)
+        case badXML(Error?)
 
         var errorDescription: String? {
             switch self {
             case .notAZip:          return String(localized: "Skráin er ekki gilt Excel-skjal.")
             case .noWorksheet:      return String(localized: "Engin vinnusíða fannst í Excel-skjalinu.")
             case .inflateFailed(let e): return "\(String(localized: "Gat ekki afþjappað Excel-skjalið:")) \(e)"
+            case .badXML(let e):
+                let detail = e?.localizedDescription ?? ""
+                return "\(String(localized: "Excel-skjalið er skemmt eða ólæsilegt.")) \(detail)"
+                    .trimmingCharacters(in: .whitespaces)
             }
         }
     }
@@ -33,7 +38,7 @@ enum XLSXReader {
         // Deildar strengir (valkvætt).
         var shared: [String] = []
         if let ss = try inflatedEntry("xl/sharedStrings.xml", in: entries, bytes: bytes) {
-            shared = parseSharedStrings(ss)
+            shared = try parseSharedStrings(ss)
         }
 
         // Finna skrá fyrstu vinnusíðunnar (annars fyrsta sheetN.xml til vara).
@@ -42,7 +47,7 @@ enum XLSXReader {
               let sheetData = try inflatedEntry(sheetPath, in: entries, bytes: bytes) else {
             throw ReadError.noWorksheet
         }
-        return parseSheet(sheetData, shared: shared)
+        return try parseSheet(sheetData, shared: shared)
     }
 
     // MARK: - ZIP
@@ -115,12 +120,20 @@ enum XLSXReader {
     /// Raw DEFLATE afþjöppun með `Compression` (Apple `COMPRESSION_ZLIB` = RFC 1951, án zlib-hauss).
     private static func inflate(_ src: [UInt8], expectedSize: Int) -> [UInt8]? {
         if expectedSize == 0 { return [] }
+        // `expectedSize` kemur úr haus skrárinnar og er því ekki treystandi: skrá sem
+        // segist afþjappast í 4 GB má ekki fá okkur til að taka frá 4 GB af minni.
+        // DEFLATE nær sjaldan meira en ~1000-faldri þjöppun; 64 MB dugar fyrir hvaða
+        // raunverulega .xlsx-blaðsíðu sem er.
+        let ceiling = min(64 << 20, max(1 << 16, src.count * 1_200))
+        guard !src.isEmpty, expectedSize <= ceiling else { return nil }
         var dst = [UInt8](repeating: 0, count: expectedSize)
-        let written = src.withUnsafeBufferPointer { sp in
-            dst.withUnsafeMutableBufferPointer { dp in
-                compression_decode_buffer(dp.baseAddress!, expectedSize,
-                                          sp.baseAddress!, src.count,
-                                          nil, COMPRESSION_ZLIB)
+        let written = src.withUnsafeBufferPointer { sp -> Int in
+            guard let srcBase = sp.baseAddress else { return 0 }
+            return dst.withUnsafeMutableBufferPointer { dp -> Int in
+                guard let dstBase = dp.baseAddress else { return 0 }
+                return compression_decode_buffer(dstBase, expectedSize,
+                                                 srcBase, src.count,
+                                                 nil, COMPRESSION_ZLIB)
             }
         }
         guard written > 0 else { return nil }
@@ -174,23 +187,23 @@ enum XLSXReader {
 
     // MARK: - XML
 
-    private static func parseSharedStrings(_ data: [UInt8]) -> [String] {
+    private static func parseSharedStrings(_ data: [UInt8]) throws -> [String] {
         let delegate = SharedStringsDelegate()
         let parser = XMLParser(data: Data(data))
         // Sum skjöl nota namespace-forskeyti (t.d. <x:si>); með namespace-vinnslu berast
         // local-nöfn ("si"/"t") óháð forskeyti.
         parser.shouldProcessNamespaces = true
         parser.delegate = delegate
-        parser.parse()
+        guard parser.parse() else { throw ReadError.badXML(parser.parserError) }
         return delegate.strings
     }
 
-    private static func parseSheet(_ data: [UInt8], shared: [String]) -> [[String]] {
+    private static func parseSheet(_ data: [UInt8], shared: [String]) throws -> [[String]] {
         let delegate = SheetDelegate(shared: shared)
         let parser = XMLParser(data: Data(data))
         parser.shouldProcessNamespaces = true
         parser.delegate = delegate
-        parser.parse()
+        guard parser.parse() else { throw ReadError.badXML(parser.parserError) }
         return delegate.rows
     }
 
@@ -237,6 +250,9 @@ private final class SheetDelegate: NSObject, XMLParserDelegate {
     private var valueBuffer = ""
     private var capturingValue = false // inni í <v>
     private var capturingText = false  // inni í <t> (inlineStr)
+    /// Sniðinn texti (`<is><r><t>Jón</t></r><r><t> Jónsson</t></r></is>`) berst í mörgum
+    /// `<t>`-bútum; þeir safnast hér og eru vistaðir í einu lagi þegar `</c>` kemur.
+    private var inlineText = ""
 
     init(shared: [String]) { self.shared = shared }
 
@@ -247,6 +263,7 @@ private final class SheetDelegate: NSObject, XMLParserDelegate {
             rowCells = [:]; maxCol = -1
         case "c":
             cellType = attributes["t"] ?? ""
+            inlineText = ""
             if let ref = attributes["r"] {
                 currentCol = XLSXReader.columnIndex(fromCellRef: ref)
             } else {
@@ -255,7 +272,7 @@ private final class SheetDelegate: NSObject, XMLParserDelegate {
         case "v":
             valueBuffer = ""; capturingValue = true
         case "t":
-            valueBuffer = capturingText ? valueBuffer : ""
+            valueBuffer = ""
             capturingText = true
         default:
             break
@@ -279,9 +296,10 @@ private final class SheetDelegate: NSObject, XMLParserDelegate {
             store(resolved)
         case "t":
             capturingText = false
-            if cellType == "inlineStr" || cellType == "str" {
-                store(valueBuffer)   // safnast upp fyrir marga <t>-búta
-            }
+            if cellType == "inlineStr" || cellType == "str" { inlineText += valueBuffer }
+        case "c":
+            if !inlineText.isEmpty { store(inlineText) }
+            inlineText = ""
         case "row":
             guard maxCol >= 0 else { rows.append([]); return }
             var arr = [String](repeating: "", count: maxCol + 1)

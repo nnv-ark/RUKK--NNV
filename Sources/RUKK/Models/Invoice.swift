@@ -143,6 +143,7 @@ final class Invoice {
         credit.recipient = original.recipient
         credit.isCreditNote = true
         credit.creditedInvoiceNumber = original.number
+        credit.templateName = original.templateName   // sama snið og reikningurinn sem er leiðréttur
         credit.collectionMethod = original.collectionMethod
         credit.discountAmount = original.discountAmount
         credit.bookingDate = credit.issueDate

@@ -39,28 +39,50 @@ enum TymeImporter {
         let rate: Decimal?
         let billing: String?
         let start: String?
+
+        /// Sama færsla á að fá sama auðkenni í hvert sinn sem skráin er lesin —
+        /// annars slitnar val notandans í listanum við hverja endurlesningu.
+        var stableID: String {
+            if let id, !id.isEmpty { return id }
+            return [project, task, note, start, duration.map(String.init)]
+                .map { $0 ?? "" }
+                .joined(separator: "|")
+        }
     }
+
+
 
     static func parse(_ data: Data) -> [TymeEntry] {
         guard let root = try? JSONDecoder().decode(Root.self, from: data) else { return [] }
-        let iso = ISO8601DateFormatter()
+
+        // Tyme skrifar ýmist með eða án sekúndubrota; báðar útgáfur eiga að lesast.
+        // Sniðin eru búin til hér (ekki sem static) svo þau séu ekki deilt milli þráða.
+        let plainISO = ISO8601DateFormatter()
+        let fractionalISO = ISO8601DateFormatter()
+        fractionalISO.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let parseDate = { (s: String) -> Date? in
+            plainISO.date(from: s) ?? fractionalISO.date(from: s)
+        }
+
         return root.data.map { r in
             let minutes: Int = {
                 let d = r.duration ?? 0
                 switch (r.duration_unit ?? "m").lowercased() {
-                case "h": return d * 60      // klukkustundir
-                case "s": return d / 60      // sekúndur
-                default:  return d           // "m" — mínútur (sjálfgefið)
+                case "h": return d * 60                                   // klukkustundir
+                case "s": return Int((Double(d) / 60).rounded())          // sekúndur — námundað,
+                                                                          // heiltöludeiling gerði
+                                                                          // 30 sek. að 0 mín.
+                default:  return d                                        // "m" — mínútur
                 }
             }()
-            return TymeEntry(id: r.id ?? UUID().uuidString,
+            return TymeEntry(id: r.stableID,
                              note: r.note ?? "",
                              task: r.task ?? "",
                              project: r.project ?? "",
                              durationMinutes: minutes,
                              rate: r.rate ?? 0,
                              billing: r.billing ?? "",
-                             start: r.start.flatMap { iso.date(from: $0) })
+                             start: r.start.flatMap(parseDate))
         }
         .sorted { ($0.start ?? .distantPast) < ($1.start ?? .distantPast) }
     }

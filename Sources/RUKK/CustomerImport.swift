@@ -169,8 +169,8 @@ enum CustomerImport {
         let firstLine = text.prefix { $0 != "\n" && $0 != "\r" }
         let candidates: [Character] = [";", ",", "\t"]
         let counts = candidates.map { c in (c, firstLine.filter { $0 == c }.count) }
-        let best = counts.max { $0.1 < $1.1 }
-        return (best?.1 ?? 0) > 0 ? best!.0 : ","
+        guard let best = counts.max(by: { $0.1 < $1.1 }), best.1 > 0 else { return "," }
+        return best.0
     }
 
     // MARK: - XML
@@ -178,6 +178,8 @@ enum CustomerImport {
     private static func parseXML(_ data: Data) throws -> [CustomerRecord] {
         let delegate = CustomerXMLDelegate()
         let parser = XMLParser(data: data)
+        // Skrár með namespace-forskeyti (<ns:vidskiptavinur>) eiga líka að lesast.
+        parser.shouldProcessNamespaces = true
         parser.delegate = delegate
         guard parser.parse() else {
             throw ImportError.underlying(parser.parserError ?? ImportError.empty)
@@ -187,7 +189,21 @@ enum CustomerImport {
 
     // MARK: - Hjálp
 
+    /// Excel skrifar „Unicode Text" sem UTF-16 með BOM. Latin-1 tekur við hvaða bætum
+    /// sem er án þess að falla, svo BOM-ið verður að ráða áður en fallið er á það —
+    /// annars flyst hver einasta lína inn sem stafarugl.
     private static func decodeText(_ data: Data) -> String {
+        let bom = [UInt8](data.prefix(3))
+        if bom.count >= 2 {
+            if bom[0] == 0xFF, bom[1] == 0xFE,
+               let s = String(data: data, encoding: .utf16LittleEndian) {
+                return String(s.dropFirst())          // BOM-stafurinn sjálfur
+            }
+            if bom[0] == 0xFE, bom[1] == 0xFF,
+               let s = String(data: data, encoding: .utf16BigEndian) {
+                return String(s.dropFirst())
+            }
+        }
         if let s = String(data: data, encoding: .utf8) { return s }
         if let s = String(data: data, encoding: .isoLatin1) { return s }
         return String(decoding: data, as: UTF8.self)
@@ -326,6 +342,12 @@ private final class CustomerXMLDelegate: NSObject, XMLParserDelegate {
 
     func parser(_ parser: XMLParser, foundCharacters string: String) {
         if currentField != nil || currentIsBoolField { elementBuffer += string }
+    }
+
+    /// <netfang><![CDATA[a@b.is]]></netfang> — annars týnist gildið.
+    func parser(_ parser: XMLParser, foundCDATA CDATABlock: Data) {
+        guard currentField != nil || currentIsBoolField else { return }
+        elementBuffer += String(decoding: CDATABlock, as: UTF8.self)
     }
 
     func parser(_ parser: XMLParser, didEndElement name: String, namespaceURI: String?, qualifiedName: String?) {

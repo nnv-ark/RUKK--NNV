@@ -4,6 +4,9 @@ import CoreImage
 
 /// Býr til QR-kóða fyrir reikning með númeri, dagsetningu og fjárhæð.
 struct InvoiceQRCode {
+    /// Dýr í smíðum — reikningssniðið teiknar QR-kóðann upp á nýtt í hverri umferð.
+    private static let ciContext = CIContext()
+
     let invoiceNumber: String
     let date: Date
     let amount: Decimal?
@@ -21,6 +24,8 @@ struct InvoiceQRCode {
             nf.maximumFractionDigits = 2
             nf.minimumFractionDigits = 2
             nf.decimalSeparator = "."
+            // Án þessa fær íslensk locale þúsundapunkt: 1.234.567.89 er ólæsilegt.
+            nf.usesGroupingSeparator = false
             if let amountStr = nf.string(from: amount as NSDecimalNumber) {
                 parts.append(amountStr)
             }
@@ -30,7 +35,7 @@ struct InvoiceQRCode {
 
     /// Býr til QR-mynd í gefinni stærð (sjálfgefið 100pt) með Core Image.
     func generateCGImage(size: CGFloat = 100) -> CGImage? {
-        guard let data = payload.data(using: .utf8) else { return nil }
+        let data = Data(payload.utf8)
 
         let filter = CIFilter(name: "CIQRCodeGenerator")
         filter?.setValue(data, forKey: "inputMessage")
@@ -42,7 +47,6 @@ struct InvoiceQRCode {
         let scaleY = size / outputImage.extent.size.height
         let transformed = outputImage.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
 
-        let context = CIContext()
-        return context.createCGImage(transformed, from: transformed.extent)
+        return Self.ciContext.createCGImage(transformed, from: transformed.extent)
     }
 }

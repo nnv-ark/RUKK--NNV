@@ -25,10 +25,11 @@ enum BatchExporter {
 
         var written = 0
         var failed = 0
+        var usedNames: Set<String> = []
 
         for invoice in invoices {
             let issuer = invoice.issuer ?? company
-            let base = safeName(for: invoice)
+            let base = uniqueName(for: invoice, taken: &usedNames)
 
             if format == .pdf || format == .both {
                 if let data = PDFRenderer.pdfData(invoice: invoice, settings: issuer) {
@@ -49,10 +50,21 @@ enum BatchExporter {
 
     // MARK: - Helpers
 
-    private static func safeName(for invoice: Invoice) -> String {
-        let raw = invoice.number.isEmpty ? "reikningur" : invoice.number
+    /// Skráarheiti sem enginn annar reikningur í sömu lotu á. Ónúmeruð drög heita öll
+    /// „reikningur“; án þessa skrifaði hvert þeirra yfir það fyrra og talningin laug.
+    private static func uniqueName(for invoice: Invoice, taken: inout Set<String>) -> String {
         let invalid = CharacterSet(charactersIn: "/:\\?%*|\"<>")
-        return raw.components(separatedBy: invalid).joined(separator: "-")
+        let base = invoice.documentFileName
+            .components(separatedBy: invalid)
+            .joined(separator: "-")
+        var candidate = base
+        var n = 2
+        while taken.contains(candidate) {
+            candidate = "\(base)-\(n)"
+            n += 1
+        }
+        taken.insert(candidate)
+        return candidate
     }
 
     private static func write(_ data: Data, to url: URL) -> Bool {
