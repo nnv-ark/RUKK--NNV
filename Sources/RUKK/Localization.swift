@@ -56,6 +56,7 @@ struct InvoiceStrings {
     var itemDescription: String { en ? "Description" : "Lýsing" }
     var quantity: String { en ? "Qty" : "Magn" }
     var amount: String   { en ? "Amount" : "Upphæð" }
+    var unitPrice: String { en ? "Unit Price" : "Einingaverð" }
     var exclVAT: String  { en ? "(excl. VAT)" : "(án VSK)" }
     var inclVAT: String  { en ? "(incl. VAT)" : "(með VSK)" }
     var vat: String      { en ? "VAT" : "VSK" }
