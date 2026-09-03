@@ -1,7 +1,7 @@
 import Foundation
 
 /// Ein færsla úr innfluttri skrá — óháð sniði (xlsx / CSV / XML).
-struct CustomerRecord: Identifiable, Equatable {
+struct CustomerRecord: Identifiable {
     let id = UUID()
     var nationalID = ""            // Kennitala
     var name = ""                  // Nafn

@@ -32,20 +32,20 @@ struct InvoiceListView: View {
                             Divider()
                         }
                         Button("Prenta…") {
-                            PDFRenderer.printInvoice(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                            PDFRenderer.printInvoice(invoice: invoice, settings: invoice.issuer ?? company)
                             invoice.printedAt = .now
                         }
                         Button("Senda í tölvupósti…") {
-                            PDFRenderer.emailInvoice(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                            PDFRenderer.emailInvoice(invoice: invoice, settings: invoice.issuer ?? company)
                             invoice.printedAt = .now
                         }
                         if invoice.isOverdue {
                             Button("Senda áminningu…") {
-                                PDFRenderer.emailReminder(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                                PDFRenderer.emailReminder(invoice: invoice, settings: invoice.issuer ?? company)
                             }
                         }
                         Button("Opna í Preview") {
-                            PDFRenderer.openInPreview(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                            PDFRenderer.openInPreview(invoice: invoice, settings: invoice.issuer ?? company)
                         }
                         Button("Síðuuppsetning…") { PDFRenderer.pageSetup() }
                         Divider()
@@ -60,12 +60,12 @@ struct InvoiceListView: View {
                         }
                         Divider()
                         Button("Flytja út PDF…") {
-                            PDFRenderer.export(invoice: invoice, settings: invoice.issuer ?? currentSettings())
+                            PDFRenderer.export(invoice: invoice, settings: invoice.issuer ?? company)
                             invoice.printedAt = .now
                         }
                         if !invoice.isEstimate {
                             Button("Flytja út XML (TS-136)…") {
-                                UBLInvoiceExporter.export(invoice: invoice, company: invoice.issuer ?? currentSettings())
+                                UBLInvoiceExporter.export(invoice: invoice, company: invoice.issuer ?? company)
                             }
                         }
                         Divider()
@@ -107,12 +107,10 @@ struct InvoiceListView: View {
         }
     }
 
-    private func currentSettings() -> AppSettings { company }
-
     private func createInvoice() {
         let invoice = estimatesOnly
-            ? Invoice.makeEstimate(in: context, company: currentSettings())
-            : Invoice.makeNext(in: context, company: currentSettings())
+            ? Invoice.makeEstimate(in: context, company: company)
+            : Invoice.makeNext(in: context, company: company)
         selection = invoice
     }
 
@@ -121,7 +119,7 @@ struct InvoiceListView: View {
     }
 
     private func duplicate(_ src: Invoice) {
-        let s = currentSettings()
+        let s = company
         let copy = Invoice(number: src.isEstimate ? "" : Invoice.formattedNumber(prefix: s.invoiceNumberPrefix, s.nextInvoiceNumber),
                            currencyCode: src.currencyCode,
                            taxRate: src.taxRate)
@@ -167,9 +165,7 @@ private struct InvoiceRow: View {
                 .frame(width: 8, height: 8)
                 .help(invoice.isPrinted ? "Prentaður" : "")
             VStack(alignment: .leading, spacing: 2) {
-                Text(invoice.isEstimate
-                     ? (invoice.estimateNumber.isEmpty ? "(ekkert númer)" : invoice.estimateNumber)
-                     : (invoice.number.isEmpty ? "(ekkert númer)" : invoice.number))
+                Text(invoice.displayNumber)
                     .font(.headline)
                 Text(invoice.recipient?.name ?? "Enginn móttakandi")
                     .font(.subheadline)

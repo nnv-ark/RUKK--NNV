@@ -93,6 +93,12 @@ final class Invoice {
     /// Hefur reikningurinn fengið fast útgáfunúmer?
     var isIssued: Bool { isNumberLocked && !number.trimmingCharacters(in: .whitespaces).isEmpty }
 
+    /// Númer til birtingar í listum: reikningsnúmer, tilboðsnúmer, annars staðgengill.
+    var displayNumber: String {
+        let n = isEstimate ? estimateNumber : number
+        return n.isEmpty ? String(localized: "(ekkert númer)") : n
+    }
+
     /// Skráarheiti fyrir PDF/viðhengi: reikningsnúmer, tilboðsnúmer eða „reikningur“.
     var documentFileName: String {
         if !number.isEmpty { return number }

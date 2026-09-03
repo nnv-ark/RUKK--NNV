@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import SwiftData
 
 /// Yfirferð fyrir innflutning viðskiptavina: sýnir lesnar færslur, merkir þær sem
@@ -201,5 +202,77 @@ struct CustomerImportView: View {
 
     private var importTitle: String {
         "\(String(localized: "Flytja inn")) \(selected.count)"
+    }
+}
+
+
+// MARK: - Innflutningsferlið
+
+/// Heldur utan um innflutning viðskiptavina: skráaval, yfirferð og villuskilaboð.
+/// Býr hér frekar en í `ContentView` svo aðalsýnin þurfi hvorki að geyma fimm
+/// stöðubreytur né þrjá kynningarhætti fyrir eitt ferli.
+@MainActor
+@Observable
+final class CustomerImportFlow {
+    var isChoosingFile = false
+    var isReviewing = false
+    var records: [CustomerRecord] = []
+    var fileName = ""
+    var error: String?
+
+    var fileTypes: [UTType] {
+        var types: [UTType] = [.commaSeparatedText, .xml]
+        if let xlsx = UTType(filenameExtension: "xlsx") { types.append(xlsx) }
+        if let tsv = UTType(filenameExtension: "tsv") { types.append(tsv) }
+        return types
+    }
+
+    func begin() {
+        error = nil
+        isChoosingFile = true
+    }
+
+    func handle(_ result: Result<[URL], Error>) {
+        error = nil
+        do {
+            guard let url = try result.get().first else { return }
+            let needsStop = url.startAccessingSecurityScopedResource()
+            defer { if needsStop { url.stopAccessingSecurityScopedResource() } }
+            records = try CustomerImport.records(from: url)
+            fileName = url.lastPathComponent
+            isReviewing = true
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+}
+
+extension View {
+    /// Tengir skráaval, yfirferðarspjald og villuskilaboð innflutningsins við sýnina.
+    func customerImport(_ flow: CustomerImportFlow, company: AppSettings?) -> some View {
+        modifier(CustomerImportModifier(flow: flow, company: company))
+    }
+}
+
+private struct CustomerImportModifier: ViewModifier {
+    @Bindable var flow: CustomerImportFlow
+    let company: AppSettings?
+
+    func body(content: Content) -> some View {
+        content
+            .fileImporter(isPresented: $flow.isChoosingFile,
+                          allowedContentTypes: flow.fileTypes,
+                          allowsMultipleSelection: false) { flow.handle($0) }
+            .sheet(isPresented: $flow.isReviewing) {
+                if let company {
+                    CustomerImportView(records: flow.records, company: company, fileName: flow.fileName)
+                }
+            }
+            .alert("Innflutningur mistókst",
+                   isPresented: Binding(get: { flow.error != nil },
+                                        set: { if !$0 { flow.error = nil } }),
+                   presenting: flow.error) { _ in
+                Button("Í lagi", role: .cancel) { flow.error = nil }
+            } message: { Text($0) }
     }
 }

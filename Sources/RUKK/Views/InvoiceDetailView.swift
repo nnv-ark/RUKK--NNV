@@ -6,11 +6,31 @@ struct InvoiceDetailView: View {
     /// Opnar nýjan reikning (t.d. nýstofnaðan kreditreikning) í aðalvalinu.
     var onOpenInvoice: (Invoice) -> Void = { _ in }
     @Environment(\.modelContext) private var context
-    @Query(sort: \Contact.name) private var contacts: [Contact]
+    @Query private var companyContacts: [Contact]
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
-    // Fyrir „Nota fyrri línu…“ — nýjustu reikningar fyrst.
-    @Query(sort: \Invoice.createdAt, order: .reverse) private var allInvoices: [Invoice]
+    /// Nýlegir reikningar útgáfufyrirtækisins — undirstaða „Nota fyrri línu…“.
+    @Query private var recentInvoices: [Invoice]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
+
+    /// Fyrirspurnirnar eru afmarkaðar við fyrirtæki reikningsins strax í gagnalaginu.
+    /// Áður sótti sýnin sérhvern viðskiptavin og sérhvern reikning í gagnagrunninum
+    /// og síaði í Swift — í hverri einustu umferð.
+    init(invoice: Invoice, onOpenInvoice: @escaping (Invoice) -> Void = { _ in }) {
+        _invoice = Bindable(wrappedValue: invoice)
+        self.onOpenInvoice = onOpenInvoice
+
+        let companyID = invoice.issuer?.id
+        _companyContacts = Query(filter: #Predicate<Contact> { $0.owner?.id == companyID },
+                                 sort: \Contact.name)
+
+        var recent = FetchDescriptor<Invoice>(
+            predicate: #Predicate<Invoice> { $0.issuer?.id == companyID },
+            sortBy: [SortDescriptor(\Invoice.createdAt, order: .reverse)])
+        // „Nota fyrri línu…“ sýnir í mesta lagi 15 ólíkar lýsingar; það þarf ekki
+        // alla reikningssöguna til.
+        recent.fetchLimit = 40
+        _recentInvoices = Query(recent)
+    }
 
     @State private var isShowingPreview = true
     @State private var previewZoom: PreviewZoom = .fit
@@ -18,19 +38,17 @@ struct InvoiceDetailView: View {
     @State private var showingTymeImport = false
     @State private var showingBlizzImport = false
 
-    // Pure read: útgáfufyrirtæki reikningsins, annars virkt, annars transient.
+    /// Tómt fyrirtæki til vara — býr til EITT eintak fyrir allt forritið. Áður varð
+    /// til nýtt `AppSettings`-líkan í hverri teikningu þegar keðjan hitti ekki.
+    @MainActor private static let unconfiguredCompany = AppSettings()
+
+    // Pure read: útgáfufyrirtæki reikningsins, annars virkt.
     // Aldrei breytt í context meðan á view-teikningu stendur.
     private var settings: AppSettings {
         invoice.issuer
             ?? companies.first(where: { $0.id.uuidString == activeCompanyID })
             ?? companies.first
-            ?? AppSettings()
-    }
-
-    /// Aðeins viðskiptavinir útgáfufyrirtækis reikningsins.
-    private var companyContacts: [Contact] {
-        let id = (invoice.issuer ?? settings).id
-        return contacts.filter { $0.owner?.id == id }
+            ?? Self.unconfiguredCompany
     }
 
     private var dueDateBinding: Binding<Date> {
@@ -79,65 +97,7 @@ struct InvoiceDetailView: View {
                          ? (invoice.estimateNumber.isEmpty ? "Nýtt tilboð" : "Tilboð \(invoice.estimateNumber)")
                          : (invoice.number.isEmpty ? "Nýr reikningur" : invoice.number))
         .toolbar {
-            ToolbarItemGroup(placement: .primaryAction) {
-                Toggle(isOn: $isShowingPreview) {
-                    Label("Forskoðun", systemImage: "eye")
-                }
-
-                if invoice.isOverdue {
-                    Button {
-                        PDFRenderer.emailReminder(invoice: invoice, settings: settings)
-                    } label: {
-                        Label("Senda áminningu", systemImage: "bell")
-                    }
-                    .help("Semja áminningu í Mail vegna gjaldfallins reiknings")
-                }
-
-                Button {
-                    PDFRenderer.printInvoice(invoice: invoice, settings: settings)
-                    invoice.printedAt = .now
-                } label: {
-                    Label("Prenta…", systemImage: "printer")
-                }
-                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
-                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er prentaður" : "")
-
-                Button {
-                    PDFRenderer.emailInvoice(invoice: invoice, settings: settings)
-                    invoice.printedAt = .now
-                } label: {
-                    Label("Senda í tölvupósti", systemImage: "envelope")
-                }
-                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
-                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er sendur" : "Senda í tölvupósti með PDF")
-
-                Menu {
-                    Button("Opna í Preview") {
-                        PDFRenderer.openInPreview(invoice: invoice, settings: settings)
-                    }
-                    Button("Flytja út PDF…") {
-                        PDFRenderer.export(invoice: invoice, settings: settings)
-                        invoice.printedAt = .now
-                    }
-                    if !invoice.isEstimate {
-                        Button("Rafrænn reikningur (UBL / TS-136)…") {
-                            UBLInvoiceExporter.export(invoice: invoice, company: settings)
-                        }
-                    }
-                    Divider()
-                    Button("Síðuuppsetning…") {
-                        PDFRenderer.pageSetup()
-                    }
-                    if invoice.isPrinted {
-                        Divider()
-                        Button("Merkja sem óprentað") { invoice.printedAt = nil }
-                    }
-                } label: {
-                    Label("Flytja út", systemImage: "square.and.arrow.up")
-                }
-                .disabled(invoice.number.isEmpty && !invoice.isEstimate)
-                .help(invoice.number.isEmpty && !invoice.isEstimate ? "Gefðu reikninginn út áður en hann er fluttur út" : "")
-            }
+            InvoiceToolbar(invoice: invoice, settings: settings, isShowingPreview: $isShowingPreview)
         }
         .focusedSceneValue(\.printInvoice) {
             PDFRenderer.printInvoice(invoice: invoice, settings: settings)
@@ -425,10 +385,9 @@ struct InvoiceDetailView: View {
 
     /// Nýjustu ólíkar línulýsingar fyrirtækisins (nýjustu fyrst, hámark 15).
     private var lineHistory: [HistoricLine] {
-        let sid = (invoice.issuer ?? settings).id
         var seen = Set<String>()
         var result: [HistoricLine] = []
-        for inv in allInvoices where inv.issuer?.id == sid && inv !== invoice {
+        for inv in recentInvoices where inv !== invoice {
             for item in inv.orderedItems {
                 let d = item.itemDescription.trimmingCharacters(in: .whitespaces)
                 guard !d.isEmpty, seen.insert(d).inserted else { continue }
@@ -490,6 +449,85 @@ private struct LineItemRow: View {
             Text(Money.format(item.subtotalIncTax, currencyCode: item.invoice?.currencyCode ?? "ISK"))
                 .monospacedDigit()
                 .frame(width: 110, alignment: .trailing)
+        }
+    }
+}
+
+/// Tækjastika reikningsspjaldsins. Eigin gerð svo `InvoiceDetailView.body` haldist
+/// læsileg — og innan þess sem þýðandinn ræður við að tegundagreina.
+private struct InvoiceToolbar: ToolbarContent {
+    @Bindable var invoice: Invoice
+    let settings: AppSettings
+    @Binding var isShowingPreview: Bool
+
+    /// Útgefinn reikningur (eða tilboð) má prenta, senda og flytja út — drög ekki.
+    private var isExportable: Bool { invoice.isEstimate || !invoice.number.isEmpty }
+
+    private var notIssuedHelp: String {
+        String(localized: "Gefðu reikninginn út áður en hann er fluttur út")
+    }
+
+    var body: some ToolbarContent {
+        ToolbarItemGroup(placement: .primaryAction) {
+            Toggle(isOn: $isShowingPreview) {
+                Label("Forskoðun", systemImage: "eye")
+            }
+
+            if invoice.isOverdue {
+                Button {
+                    PDFRenderer.emailReminder(invoice: invoice, settings: settings)
+                } label: {
+                    Label("Senda áminningu", systemImage: "bell")
+                }
+                .help("Semja áminningu í Mail vegna gjaldfallins reiknings")
+            }
+
+            Button {
+                PDFRenderer.printInvoice(invoice: invoice, settings: settings)
+                invoice.printedAt = .now
+            } label: {
+                Label("Prenta…", systemImage: "printer")
+            }
+            .disabled(!isExportable)
+            .help(isExportable ? "" : String(localized: "Gefðu reikninginn út áður en hann er prentaður"))
+
+            Button {
+                PDFRenderer.emailInvoice(invoice: invoice, settings: settings)
+                invoice.printedAt = .now
+            } label: {
+                Label("Senda í tölvupósti", systemImage: "envelope")
+            }
+            .disabled(!isExportable)
+            .help(isExportable
+                  ? String(localized: "Senda í tölvupósti með PDF")
+                  : String(localized: "Gefðu reikninginn út áður en hann er sendur"))
+
+            Menu {
+                Button("Opna í Preview") {
+                    PDFRenderer.openInPreview(invoice: invoice, settings: settings)
+                }
+                Button("Flytja út PDF…") {
+                    PDFRenderer.export(invoice: invoice, settings: settings)
+                    invoice.printedAt = .now
+                }
+                if !invoice.isEstimate {
+                    Button("Rafrænn reikningur (UBL / TS-136)…") {
+                        UBLInvoiceExporter.export(invoice: invoice, company: settings)
+                    }
+                }
+                Divider()
+                Button("Síðuuppsetning…") {
+                    PDFRenderer.pageSetup()
+                }
+                if invoice.isPrinted {
+                    Divider()
+                    Button("Merkja sem óprentað") { invoice.printedAt = nil }
+                }
+            } label: {
+                Label("Flytja út", systemImage: "square.and.arrow.up")
+            }
+            .disabled(!isExportable)
+            .help(isExportable ? "" : notIssuedHelp)
         }
     }
 }

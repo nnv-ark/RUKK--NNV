@@ -74,41 +74,6 @@ struct SettingsView: View {
         selectedID = c.id.uuidString
     }
 
-    private func duplicate(_ src: AppSettings) {
-        let c = AppSettings()
-        c.companyName = src.companyName + " afrit"
-        c.fullName = src.fullName
-        c.companyTagline = src.companyTagline
-        c.companyEmail = src.companyEmail
-        c.companyPhone = src.companyPhone
-        c.companyWebsite = src.companyWebsite
-        c.companyAddress = src.companyAddress
-        c.companyNationalID = src.companyNationalID
-        c.companyVATNumber = src.companyVATNumber
-        c.bankAccountNumber = src.bankAccountNumber
-        c.collectionMethod = src.collectionMethod
-        c.logoData = src.logoData
-        c.defaultCurrencyCode = src.defaultCurrencyCode
-        c.defaultTaxRate = src.defaultTaxRate
-        c.defaultPaymentTermDays = src.defaultPaymentTermDays
-        c.defaultEindagiDays = src.defaultEindagiDays
-        c.defaultTemplate = src.defaultTemplate
-        c.defaultNote = src.defaultNote
-        c.dateFormat = src.dateFormat
-        c.emailSubject = src.emailSubject
-        c.emailBody = src.emailBody
-        c.invoiceNumberPrefix = src.invoiceNumberPrefix
-        c.nextInvoiceNumber = 1     // nýtt fyrirtæki byrjar eigin númerun á 001
-        c.logoScale = src.logoScale
-        c.fontName = src.fontName
-        c.baseFontSize = src.baseFontSize
-        c.headingFontSize = src.headingFontSize
-        c.textColorHex = src.textColorHex
-        c.paperSize = src.paperSize
-        context.insert(c)
-        selectedID = c.id.uuidString
-    }
-
     private func delete(_ company: AppSettings) {
         guard companies.count > 1 else { return }
         let wasActive = company.id.uuidString == activeCompanyID

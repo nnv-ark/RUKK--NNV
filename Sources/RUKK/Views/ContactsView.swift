@@ -70,8 +70,7 @@ struct ContactsView: View {
             }
         }
         .navigationTitle("Viðskiptavinir")
-        // Leit efst í dálki 1 — „Nýr viðskiptavinur" er fyrsta færslan í listanum
-        // og innflutningur býðst í dálki 2 þegar nýr viðskiptavinur er stofnaður.
+        // Leitin situr efst; „Nýr viðskiptavinur" er fyrsta færslan í listanum sjálfum.
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack(spacing: 6) {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)

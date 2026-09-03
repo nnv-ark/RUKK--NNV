@@ -1,6 +1,5 @@
 import SwiftUI
 import SwiftData
-import UniformTypeIdentifiers
 
 enum SidebarItem: Hashable {
     case dashboard
@@ -22,19 +21,9 @@ struct ContentView: View {
     /// Viðskiptavinur sem var rétt í þessu stofnaður — fær innflutningsvalkost í dálki 2.
     @State private var newContactID: PersistentIdentifier?
 
-    // Innflutningur viðskiptavina (xlsx / CSV / XML) — í ContentView svo ⌘I virki alltaf.
-    @State private var showingCustomerImporter = false
-    @State private var customerImportRecords: [CustomerRecord] = []
-    @State private var customerImportFileName = ""
-    @State private var showingCustomerReview = false
-    @State private var customerImportError: String?
-
-    private var customerImportTypes: [UTType] {
-        var types: [UTType] = [.commaSeparatedText, .xml]
-        if let xlsx = UTType(filenameExtension: "xlsx") { types.append(xlsx) }
-        if let tsv = UTType(filenameExtension: "tsv") { types.append(tsv) }
-        return types
-    }
+    /// Innflutningur viðskiptavina (xlsx / CSV / XML) — hér svo ⌘I virki óháð völdum
+    /// flipa. Ferlið sjálft býr í `CustomerImportFlow`.
+    @State private var customerImport = CustomerImportFlow()
 
     /// Gluggamyndin sjálf. Aðskilin frá `body` svo hvorug keðjan verði of löng
     /// fyrir þýðandann (hann gefst upp á að tegundagreina eina risakeðju).
@@ -55,12 +44,6 @@ struct ContentView: View {
         }
         .toolbarBackground(Self.titlebarGradient, for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
-    }
-
-    /// Villuskilaboð innflutnings sem `alert` getur bundist.
-    private var customerImportErrorBinding: Binding<Bool> {
-        Binding(get: { customerImportError != nil },
-                set: { if !$0 { customerImportError = nil } })
     }
 
     var body: some View {
@@ -94,21 +77,7 @@ struct ContentView: View {
         .focusedSceneValue(\.newInvoice, createInvoice)
         .focusedSceneValue(\.newEstimate, createEstimate)
         .focusedSceneValue(\.importCustomers, beginCustomerImport)
-        .fileImporter(isPresented: $showingCustomerImporter,
-                      allowedContentTypes: customerImportTypes,
-                      allowsMultipleSelection: false) { result in
-            handleCustomerImport(result)
-        }
-        .sheet(isPresented: $showingCustomerReview) {
-            if let company = activeCompany {
-                CustomerImportView(records: customerImportRecords, company: company, fileName: customerImportFileName)
-            }
-        }
-        .alert("Innflutningur mistókst",
-               isPresented: customerImportErrorBinding,
-               presenting: customerImportError) { _ in
-            Button("Í lagi", role: .cancel) { customerImportError = nil }
-        } message: { Text($0) }
+        .customerImport(customerImport, company: activeCompany)
     }
 
     /// Dálkur 1: fyrirtækjaval, flipar og listi valins hluta — allt í einum
@@ -213,25 +182,9 @@ struct ContentView: View {
     /// Opnar skráaval fyrir innflutning viðskiptavina (fer fyrst á Viðskiptavinir-flipann).
     private func beginCustomerImport() {
         selection = .contacts
-        showingCustomerImporter = true
+        customerImport.begin()
     }
 
-
-    /// Les valda skrá, býr til færslur og opnar yfirferð. Villur birtast í `alert`.
-    private func handleCustomerImport(_ result: Result<[URL], Error>) {
-        customerImportError = nil
-        do {
-            guard let url = try result.get().first else { return }
-            let needsStop = url.startAccessingSecurityScopedResource()
-            defer { if needsStop { url.stopAccessingSecurityScopedResource() } }
-            let records = try CustomerImport.records(from: url)
-            customerImportRecords = records
-            customerImportFileName = url.lastPathComponent
-            showingCustomerReview = true
-        } catch {
-            customerImportError = error.localizedDescription
-        }
-    }
 
     /// Eldri gögn án fyrirtæris eru færð á virkt fyrirtæki svo þau hverfi ekki.
     private func migrateOrphans(to company: AppSettings) {

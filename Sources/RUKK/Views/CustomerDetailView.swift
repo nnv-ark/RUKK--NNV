@@ -48,9 +48,7 @@ struct CustomerDetailView: View {
                 ForEach(invoices.sorted { $0.createdAt > $1.createdAt }) { inv in
                     Button { openInvoice(inv) } label: {
                         HStack {
-                            Text(inv.isEstimate
-                                 ? (inv.estimateNumber.isEmpty ? "(tilboð)" : inv.estimateNumber)
-                                 : (inv.number.isEmpty ? "(ekkert nr.)" : inv.number))
+                            Text(inv.displayNumber)
                             Text(inv.issueDate.formatted(date: .numeric, time: .omitted))
                                 .font(.caption).foregroundStyle(.secondary)
                             Spacer()
