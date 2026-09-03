@@ -43,6 +43,7 @@
 		3000000000000000000000C0 /* RUKK.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C0 /* RUKK.icon */; };
 		3000000000000000000000F0 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F0 /* Localizable.xcstrings */; };
 		3000000000000000000000F1 /* Localization.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F1 /* Localization.swift */; };
+		30000000000000000000A0FA /* Appearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000A0FA /* Appearance.swift */; };
 		3000000000000000000000B4 /* CustomStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B4 /* CustomStatus.swift */; };
 		3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B5 /* IcelandicTemplate.swift */; };
 		3000000000000000000000F2 /* UniversalTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F2 /* UniversalTemplate.swift */; };
@@ -87,6 +88,7 @@
 		2000000000000000000000C0 /* RUKK.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = RUKK.icon; sourceTree = "<group>"; };
 		2000000000000000000000F0 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		2000000000000000000000F1 /* Localization.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Localization.swift; sourceTree = "<group>"; };
+		20000000000000000000A0FA /* Appearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Appearance.swift; sourceTree = "<group>"; };
 		2000000000000000000000B3 /* RUKK.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RUKK.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		2000000000000000000000B4 /* CustomStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomStatus.swift; sourceTree = "<group>"; };
 		2000000000000000000000B5 /* IcelandicTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IcelandicTemplate.swift; sourceTree = "<group>"; };
@@ -146,6 +148,7 @@
 			children = (
 				2000000000000000000000A1 /* RUKKApp.swift */,
 				2000000000000000000000F1 /* Localization.swift */,
+				20000000000000000000A0FA /* Appearance.swift */,
 				2000000000000000000000B7 /* FocusedActions.swift */,
 				2000000000000000000000E3 /* DemoSupport.swift */,
 				2000000000000000000000E4 /* CalendarImporter.swift */,
@@ -307,6 +310,7 @@
 			files = (
 				3000000000000000000000A1 /* RUKKApp.swift in Sources */,
 				3000000000000000000000F1 /* Localization.swift in Sources */,
+				30000000000000000000A0FA /* Appearance.swift in Sources */,
 				3000000000000000000000B7 /* FocusedActions.swift in Sources */,
 				3000000000000000000000E3 /* DemoSupport.swift in Sources */,
 				3000000000000000000000E4 /* CalendarImporter.swift in Sources */,

@@ -10,12 +10,7 @@ struct UniversalTemplate: View {
     private let hPad: CGFloat = 48
     private let s = InvoiceStrings(.english)
 
-    private static func pageSize(_ paper: String) -> CGSize {
-        switch paper {
-        case "letter": CGSize(width: 612, height: 792)
-        default:       CGSize(width: 595.28, height: 841.89)   // A4
-        }
-    }
+    private static func pageSize(_ paper: String) -> CGSize { InvoiceRenderer.pageSize(paper) }
 
     private var page: CGSize { Self.pageSize(settings.paperSize) }
     private var textColor: Color { Color(hex: settings.textColorHex) ?? .black }

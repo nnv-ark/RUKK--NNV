@@ -13,6 +13,7 @@ struct InvoiceDetailView: View {
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
 
     @State private var isShowingPreview = true
+    @State private var previewZoom: PreviewZoom = .fit
     @State private var showingCalendarImport = false
     @State private var showingTymeImport = false
     @State private var showingBlizzImport = false
@@ -71,7 +72,7 @@ struct InvoiceDetailView: View {
 
             if isShowingPreview {
                 previewPane
-                    .frame(minWidth: 480)
+                    .frame(minWidth: 340, idealWidth: 520)
             }
         }
         .navigationTitle(invoice.isEstimate
@@ -352,13 +353,62 @@ struct InvoiceDetailView: View {
         .formStyle(.grouped)
     }
 
+    /// Stækkun forskoðunar. „Passa" skalar síðuna eftir breidd dálksins svo hún
+    /// sjáist alltaf í heild — fast pappírsmál klipptist áður af í þröngum dálki.
+    private enum PreviewZoom: Hashable, CaseIterable, Identifiable {
+        case fit, actual, large
+        var id: Self { self }
+        var label: LocalizedStringKey {
+            switch self {
+            case .fit:    "Passa"
+            case .actual: "100%"
+            case .large:  "150%"
+            }
+        }
+        /// Fast hlutfall, eða `nil` þegar skala á eftir breidd.
+        var factor: CGFloat? {
+            switch self {
+            case .fit:    nil
+            case .actual: 1
+            case .large:  1.5
+            }
+        }
+    }
+
     private var previewPane: some View {
-        ScrollView([.horizontal, .vertical]) {
-            InvoiceRenderer.view(for: invoice, settings: settings)
-                .border(Color(white: 0.85))
-                .padding(24)
+        let page = InvoiceRenderer.pageSize(settings.paperSize)
+        let inset: CGFloat = 16
+
+        return GeometryReader { geo in
+            // Passa: fyllir breidd dálksins (en stækkar ekki úr hófi fram).
+            let fitted = min(max(geo.size.width - inset * 2, 1) / page.width, 1.5)
+            let scale = previewZoom.factor ?? fitted
+
+            ScrollView(previewZoom == .fit ? .vertical : [.horizontal, .vertical]) {
+                InvoiceRenderer.view(for: invoice, settings: settings)
+                    .frame(width: page.width, height: page.height)
+                    .scaleEffect(scale, anchor: .topLeading)
+                    // Skölun ein og sér breytir ekki plássinu sem sýnin tekur —
+                    // ytri ramminn segir uppsetningunni raunstærð síðunnar.
+                    .frame(width: page.width * scale, height: page.height * scale,
+                           alignment: .topLeading)
+                    .border(Color(white: 0.85))
+                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    .padding(inset)
+                    .frame(maxWidth: previewZoom == .fit ? .infinity : nil)   // miðjuð
+            }
+            .scrollBounceBehavior(.basedOnSize)
         }
         .background(Color(nsColor: .windowBackgroundColor))
+        .overlay(alignment: .bottomTrailing) {
+            Picker("Stækkun", selection: $previewZoom) {
+                ForEach(PreviewZoom.allCases) { Text($0.label).tag($0) }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 170)
+            .padding(10)
+        }
     }
 
     private func deleteItems(at offsets: IndexSet) {

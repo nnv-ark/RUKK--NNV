@@ -6,6 +6,9 @@ struct CustomerDetailView: View {
     @Environment(\.modelContext) private var context
     @Bindable var contact: Contact
     var openInvoice: (Invoice) -> Void = { _ in }
+    /// Sett þegar þessi viðskiptavinur var rétt í þessu stofnaður — þá býðst
+    /// innflutningur úr skrá sem valkostur við handvirkan innslátt.
+    var onImport: (() -> Void)?
 
     private var currency: String { contact.owner?.defaultCurrencyCode ?? "ISK" }
     private var invoices: [Invoice] { contact.invoices }
@@ -14,6 +17,16 @@ struct CustomerDetailView: View {
 
     var body: some View {
         Form {
+            if let onImport {
+                Section {
+                    Button(action: onImport) {
+                        Label("Flytja inn viðskiptavini úr skrá…", systemImage: "square.and.arrow.down")
+                    }
+                } footer: {
+                    Text("Excel (.xlsx), CSV eða XML — í stað þess að slá inn handvirkt.")
+                }
+            }
+
             Section("Mælaborð") {
                 kpiGrid
                 if !yearly.isEmpty {

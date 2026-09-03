@@ -180,6 +180,7 @@ private struct ProfileTab: View {
 
 private struct LogoPicker: View {
     @Binding var data: Data?
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 12) {
@@ -198,6 +199,9 @@ private struct LogoPicker: View {
                 }
             }
             .frame(width: 80, height: 80)
+            // Dökk merki á gagnsæjum grunni þurfa ljósan flöt í dökku útliti.
+            .background(data != nil && colorScheme == .dark ? Color.white.opacity(0.92) : .clear,
+                        in: RoundedRectangle(cornerRadius: 6))
             .clipShape(RoundedRectangle(cornerRadius: 6))
 
             VStack(alignment: .leading, spacing: 6) {
@@ -292,6 +296,7 @@ private struct InvoiceTab: View {
 
 private struct AppearanceTab: View {
     @Bindable var settings: AppSettings
+    @AppStorage("appAppearance") private var appAppearance = AppAppearance.system.rawValue
 
     private let families: [String] = {
         (["" ] + NSFontManager.shared.availableFontFamilies).sorted {
@@ -301,6 +306,19 @@ private struct AppearanceTab: View {
 
     var body: some View {
         Form {
+            Section {
+                Picker("Útlit", selection: $appAppearance) {
+                    ForEach(AppAppearance.allCases) { mode in
+                        Text(mode.label).tag(mode.rawValue)
+                    }
+                }
+                .pickerStyle(.radioGroup)
+            } header: {
+                Text("Útlit forritsins")
+            } footer: {
+                Text("Gildir um RUKK sjálft. Reikningurinn breytist ekki — hann er alltaf prentaður á hvítan pappír.")
+            }
+
             Section("Leturgerð") {
                 Picker("Letur", selection: $settings.fontName) {
                     ForEach(families, id: \.self) { fam in

@@ -8,13 +8,13 @@ struct ContactsView: View {
     @State private var searchText = ""
 
     private let company: AppSettings
-    /// Ræst þegar notandi vill flytja inn viðskiptavini (eignarhald á ferlinu er í ContentView
-    /// svo ⌘I-valmyndaskipunin virki óháð völdum flipa).
-    private let onImport: () -> Void
+    /// Ræst þegar nýr viðskiptavinur verður til — dálkur 2 býður þá innflutning
+    /// sem valkost við handvirka innslátt.
+    private let onCreate: (Contact) -> Void
 
-    init(company: AppSettings, selection: Binding<Contact?>, onImport: @escaping () -> Void = {}) {
+    init(company: AppSettings, selection: Binding<Contact?>, onCreate: @escaping (Contact) -> Void = { _ in }) {
         self.company = company
-        self.onImport = onImport
+        self.onCreate = onCreate
         _selection = selection
         let cid = company.id
         _contacts = Query(filter: #Predicate<Contact> { $0.owner?.id == cid }, sort: \Contact.name)
@@ -31,6 +31,7 @@ struct ContactsView: View {
 
     var body: some View {
         List(selection: $selection) {
+            newCustomerRow
             ForEach(filteredContacts) { contact in
                 VStack(alignment: .leading, spacing: 1) {
                     Text(contact.name.isEmpty ? "(nafnlaus)" : contact.name).font(.headline)
@@ -69,30 +70,10 @@ struct ContactsView: View {
             }
         }
         .navigationTitle("Viðskiptavinir")
-        // „Nýr viðskiptavinur" og leit efst í dálki 2.
+        // Leit efst í dálki 1 — „Nýr viðskiptavinur" er fyrsta færslan í listanum
+        // og innflutningur býðst í dálki 2 þegar nýr viðskiptavinur er stofnaður.
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
-                HStack {
-                    Button(action: newCustomer) {
-                        Label("Nýr viðskiptavinur", systemImage: "person.badge.plus")
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.borderless)
-                    .fixedSize()
-                    .help("Nýr viðskiptavinur")
-                    Spacer()
-                    Button { onImport() } label: {
-                        Label("Flytja inn…", systemImage: "square.and.arrow.down")
-                            .lineLimit(1)
-                    }
-                    .buttonStyle(.borderless)
-                    .fixedSize()
-                    .help("Flytja inn viðskiptavini úr Excel (.xlsx), CSV eða XML")
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 7)
-                .padding(.bottom, 6)
-
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                     TextField("Leita að viðskiptavini", text: $searchText)
@@ -106,6 +87,7 @@ struct ContactsView: View {
                     }
                 }
                 .padding(.horizontal, 10)
+                .padding(.top, 7)
                 .padding(.bottom, 7)
 
                 Divider()
@@ -114,10 +96,37 @@ struct ContactsView: View {
         }
     }
 
+    /// Efsta færslan í listanum: lítur út eins og viðskiptavinur, en römmuð eins og hnappur.
+    private var newCustomerRow: some View {
+        Button(action: newCustomer) {
+            HStack(spacing: 8) {
+                Image(systemName: "plus")
+                    .font(.headline)
+                    .foregroundStyle(.tint)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Nýr viðskiptavinur").font(.headline)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.vertical, 5)
+            .padding(.horizontal, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+        }
+        .buttonStyle(.plain)
+        .overlay {
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.secondary.opacity(0.45), lineWidth: 1)
+        }
+        .help("Nýr viðskiptavinur")
+        .listRowSeparator(.hidden)
+    }
+
     private func newCustomer() {
         let c = Contact(name: "Nýr viðskiptavinur")
         c.owner = company
         context.insert(c)
         selection = c
+        onCreate(c)
     }
 }

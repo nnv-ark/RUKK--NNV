@@ -11,13 +11,16 @@ enum SidebarItem: Hashable {
 
 struct ContentView: View {
     @Environment(\.modelContext) private var context
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(ImportInbox.self) private var inbox
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
     @AppStorage("kulaNormalizedV1") private var didNormalize = false
-    @State private var selection: SidebarItem? = .dashboard
+    @State private var selection: SidebarItem = .dashboard
     @State private var selectedInvoice: Invoice?
     @State private var selectedContact: Contact?
+    /// Viðskiptavinur sem var rétt í þessu stofnaður — fær innflutningsvalkost í dálki 2.
+    @State private var newContactID: PersistentIdentifier?
 
     // Innflutningur viðskiptavina (xlsx / CSV / XML) — í ContentView svo ⌘I virki alltaf.
     @State private var showingCustomerImporter = false
@@ -33,80 +36,35 @@ struct ContentView: View {
         return types
     }
 
-    var body: some View {
+    /// Gluggamyndin sjálf. Aðskilin frá `body` svo hvorug keðjan verði of löng
+    /// fyrir þýðandann (hann gefst upp á að tegundagreina eina risakeðju).
+    private var splitView: some View {
         NavigationSplitView {
-            List(selection: $selection) {
-                Label("Mælaborð", systemImage: "chart.bar.xaxis")
-                    .tag(SidebarItem.dashboard)
-                Section("Bókasafn") {
-                    Label("Reikningar", systemImage: "doc.text")
-                        .tag(SidebarItem.invoices)
-                    Label("Tilboð", systemImage: "doc.append")
-                        .tag(SidebarItem.estimates)
-                    Label("Viðskiptavinir", systemImage: "person.2")
-                        .tag(SidebarItem.contacts)
-                }
-            }
-            .navigationSplitViewColumnWidth(min: 220, ideal: 220)
-            // Dálkur 1 er aldrei samanbrjótanlegur: fjarlægjum hnappinn og föst lágmarksbreidd.
-            .toolbar(removing: .sidebarToggle)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
-                    brandHeader
-                    companySwitcher
-                }
-            }
-        } content: {
-            if let company = activeCompany {
-                switch selection {
-                case .dashboard:
-                    dashboardBranding(company)
-                case .invoices, .none:
-                    InvoiceListView(company: company, selection: $selectedInvoice)
-                        .id(company.id)               // ný fyrirspurn þegar skipt er um fyrirtæki
-                case .estimates:
-                    InvoiceListView(company: company, selection: $selectedInvoice, estimatesOnly: true)
-                        .id(company.id)
-                case .contacts:
-                    ContactsView(company: company, selection: $selectedContact, onImport: beginCustomerImport)
-                        .id(company.id)
-                }
-            } else {
-                ProgressView()
-            }
+            sidebar
+                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
         } detail: {
-            switch selection {
-            case .dashboard:
-                if let company = activeCompany {
-                    DashboardView(company: company) { invoice in
-                        selectedInvoice = invoice
-                        selection = .invoices
-                    }
-                    .id(company.id)
-                } else {
-                    ProgressView()
-                }
-            case .contacts:
-                if let contact = selectedContact {
-                    CustomerDetailView(contact: contact) { invoice in
-                        selectedInvoice = invoice
-                        selection = .invoices
-                    }
-                } else {
-                    ContentUnavailableView("Enginn viðskiptavinur valinn", systemImage: "person.2",
-                                           description: Text("Veldu eða búðu til viðskiptavin."))
-                }
-            default:
-                if let invoice = selectedInvoice {
-                    InvoiceDetailView(invoice: invoice) { newInvoice in
-                        selectedInvoice = newInvoice
-                    }
-                } else {
-                    ContentUnavailableView("Ekkert valið", systemImage: "doc.text",
-                                           description: Text("Veldu eða búðu til reikning."))
-                }
+            detail
+        }
+        .toolbar {
+            // Ósýnilegt atriði sem heldur tækjastikunni í fullri hæð líka þar sem engir
+            // hnappar eiga við (t.d. mælaborðið) — annars fellur hún saman í mjóa rönd
+            // og litastiginn verður helmingi grennri en í hinum gluggunum.
+            ToolbarItem(placement: .navigation) {
+                Color.clear.frame(width: 1, height: 28)
             }
         }
+        .toolbarBackground(Self.titlebarGradient, for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
+    }
+
+    /// Villuskilaboð innflutnings sem `alert` getur bundist.
+    private var customerImportErrorBinding: Binding<Bool> {
+        Binding(get: { customerImportError != nil },
+                set: { if !$0 { customerImportError = nil } })
+    }
+
+    var body: some View {
+        splitView
         .task {
             // Tryggja að a.m.k. eitt fyrirtæki sé til og að virkt fyrirtæki sé valið.
             let company = AppSettings.active(in: context, activeID: activeCompanyID)
@@ -120,6 +78,11 @@ struct ContentView: View {
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
             selectedContact = nil
+            newContactID = nil
+        }
+        .onChange(of: selectedContact) { _, contact in
+            // Boðið hverfur um leið og valið færist á annan viðskiptavin.
+            if contact?.id != newContactID { newContactID = nil }
         }
         .onChange(of: inbox.pending) { _, payload in
             if let payload { importInvoice(payload) }
@@ -142,11 +105,112 @@ struct ContentView: View {
             }
         }
         .alert("Innflutningur mistókst",
-               isPresented: Binding(get: { customerImportError != nil },
-                                    set: { if !$0 { customerImportError = nil } }),
+               isPresented: customerImportErrorBinding,
                presenting: customerImportError) { _ in
             Button("Í lagi", role: .cancel) { customerImportError = nil }
         } message: { Text($0) }
+    }
+
+    /// Dálkur 1: fyrirtækjaval, flipar og listi valins hluta — allt í einum
+    /// samanbrjótanlegum dálki (áður var listinn í sérstökum miðjudálki).
+    private var sidebar: some View {
+        VStack(spacing: 0) {
+            companySwitcher
+            sectionPicker
+            sidebarList
+        }
+    }
+
+    /// Listi valins hluta — eigin bygging svo þýðandinn ráði við tjáninguna.
+    @ViewBuilder
+    private var sidebarList: some View {
+        if let company = activeCompany {
+            switch selection {
+            case .dashboard:
+                // Mælaborðið á allan hægri dálkinn — dálkur 1 er auður á meðan.
+                Color.clear
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            case .invoices:
+                InvoiceListView(company: company, selection: $selectedInvoice)
+                    .id(company.id)               // ný fyrirspurn þegar skipt er um fyrirtæki
+            case .estimates:
+                InvoiceListView(company: company, selection: $selectedInvoice, estimatesOnly: true)
+                    .id(company.id)
+            case .contacts:
+                ContactsView(company: company, selection: $selectedContact) { created in
+                    newContactID = created.id
+                }
+                .id(company.id)
+            }
+        } else {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+
+    /// Innflutningur býðst aðeins þeim viðskiptavini sem var rétt í þessu stofnaður.
+    private func importOffer(for contact: Contact) -> (() -> Void)? {
+        guard contact.id == newContactID else { return nil }
+        return beginCustomerImport
+    }
+
+    /// Dálkur 2: innihald valins hluta.
+    @ViewBuilder
+    private var detail: some View {
+            switch selection {
+            case .dashboard:
+                if let company = activeCompany {
+                    DashboardView(company: company) { invoice in
+                        selectedInvoice = invoice
+                        selection = .invoices
+                    }
+                    .id(company.id)
+                } else {
+                    ProgressView()
+                }
+            case .contacts:
+                if let contact = selectedContact {
+                    CustomerDetailView(
+                        contact: contact,
+                        openInvoice: { invoice in
+                            selectedInvoice = invoice
+                            selection = .invoices
+                        },
+                        onImport: importOffer(for: contact))
+                } else {
+                    ContentUnavailableView("Enginn viðskiptavinur valinn", systemImage: "person.2",
+                                           description: Text("Veldu eða búðu til viðskiptavin."))
+                }
+            default:
+                if let invoice = selectedInvoice {
+                    InvoiceDetailView(invoice: invoice) { newInvoice in
+                        selectedInvoice = newInvoice
+                    }
+                } else {
+                    ContentUnavailableView("Ekkert valið", systemImage: "doc.text",
+                                           description: Text("Veldu eða búðu til reikning."))
+                }
+            }
+    }
+
+    /// Flipar efst í dálki 1 — í stað gömlu hliðarstikunnar.
+    private var sectionPicker: some View {
+        Picker("Hluti", selection: $selection) {
+            Image(systemName: "chart.bar.xaxis").tag(SidebarItem.dashboard)
+                .help("Mælaborð")
+            Image(systemName: "doc.text").tag(SidebarItem.invoices)
+                .help("Reikningar")
+            Image(systemName: "doc.append").tag(SidebarItem.estimates)
+                .help("Tilboð")
+            Image(systemName: "person.2").tag(SidebarItem.contacts)
+                .help("Viðskiptavinir")
+        }
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.bar)
+        .overlay(alignment: .bottom) { Divider() }
     }
 
     /// Opnar skráaval fyrir innflutning viðskiptavina (fer fyrst á Viðskiptavinir-flipann).
@@ -154,6 +218,7 @@ struct ContentView: View {
         selection = .contacts
         showingCustomerImporter = true
     }
+
 
     /// Les valda skrá, býr til færslur og opnar yfirferð. Villur birtast í `alert`.
     private func handleCustomerImport(_ result: Result<[URL], Error>) {
@@ -266,46 +331,20 @@ struct ContentView: View {
         companies.first { $0.id.uuidString == activeCompanyID } ?? companies.first
     }
 
-    /// Stórt fyrirtæktislógó í dálki 2 þegar mælaborð er valið
-    /// (nafn fyrirtækis til vara ef ekkert lógó er sett).
-    @ViewBuilder
-    private func dashboardBranding(_ company: AppSettings) -> some View {
-        VStack(spacing: 16) {
-            Spacer()
-            if let data = company.logoData, let img = NSImage(data: data) {
-                Image(nsImage: img)
-                    .resizable()
-                    .scaledToFit()
-                    // Aldrei stærra en lógóið á opnunarskjánum (96 px).
-                    .frame(maxWidth: 96, maxHeight: 96)
-                    .accessibilityLabel(Text(company.displayName))
-            } else {
-                Text(company.displayName.isEmpty ? "FYRIRTÆKI" : company.displayName)
-                    .font(.largeTitle.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(40)
-    }
+    /// Litastigi gluggarandarinnar: dauft rautt → skært rautt → dauft rautt.
+    /// Tónarnir eru teknir beint úr RUKK-merkinu (dýpsti og bjartasti rauði punktur þess).
+    private static let titlebarGradient = LinearGradient(
+        stops: [
+            .init(color: Color(hex: "#7A1600") ?? .red,    location: 0.0),
+            .init(color: Color(hex: "#FF5400") ?? .orange, location: 0.5),
+            .init(color: Color(hex: "#7A1600") ?? .red,    location: 1.0),
+        ],
+        startPoint: .leading, endPoint: .trailing)
 
-    /// App-vörumerki efst í hliðarstiku — birtist aðeins einu sinni.
-    private var brandHeader: some View {
-        HStack(spacing: 8) {
-            Image("Logo")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 26, height: 26)
-                .clipShape(Circle())
-            Text("RUKK")
-                .font(.headline)
-            Spacer()
-        }
-        .padding(.horizontal, 12)
-        .padding(.top, 8)
-        .padding(.bottom, 2)
+    /// Merki fyrirtækja eru nær alltaf dökk á gagnsæjum grunni. Í dökku útliti fá þau
+    /// ljósan flöt undir sig svo þau hverfi ekki ofan í bakgrunninn.
+    private var logoBackdrop: Color {
+        colorScheme == .dark ? Color.white.opacity(0.92) : .clear
     }
 
     /// Native fyrirtækjaval efst í hliðarstiku — popup með haki á virku fyrirtæki.
@@ -315,7 +354,9 @@ struct ContentView: View {
             if let data = activeCompany?.logoData, let img = NSImage(data: data) {
                 Image(nsImage: img)
                     .resizable().scaledToFit()
-                    .frame(width: 30, height: 30)
+                    .frame(width: 26, height: 26)
+                    .padding(2)
+                    .background(logoBackdrop, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
                     .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             } else {
                 Image(systemName: "building.2.crop.circle")

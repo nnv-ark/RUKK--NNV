@@ -48,9 +48,12 @@ struct RUKKApp: App {
         // svo opna megi gluggann aftur eftir að honum er lokað (App Review gl. 4.0).
         Window("RUKK", id: "main") {
             RootView()
+                .appAppearance()
         }
         .modelContainer(container)
         .defaultSize(width: 1200, height: 760)
+        // Full hæð á tækjastikunni (eins og í BLIZZ) — ekki samanfallin titilrönd.
+        .windowToolbarStyle(.unified(showsTitle: true))
         // Frjálst skalanlegur gluggi (innihald ræður lágmarki). `Window` fær annars
         // `.contentSize` sjálfgefið sem gerir hann erfiðan að stækka/minnka.
         .windowResizability(.contentMinSize)
@@ -60,6 +63,7 @@ struct RUKKApp: App {
         Settings {
             SettingsView()
                 .modelContainer(container)
+                .appAppearance()
         }
         .defaultSize(width: 640, height: 760)
         .environment(\.locale, AppLanguage.from(uiLanguage).locale)
@@ -164,3 +168,4 @@ struct RUKKCommands: Commands {
         }
     }
 }
+
