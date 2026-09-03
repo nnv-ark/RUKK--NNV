@@ -136,7 +136,12 @@ struct InvoiceDetailView: View {
                 dropError = String(localized: "Skráin inniheldur engar línur sem RUKK skilur.")
                 return false
             }
-            append(payload.lines)
+            let lines = payload.unbilledLines
+            guard !lines.isEmpty else {
+                dropError = String(localized: "Öll vinnan í sendingunni er þegar rukkuð.")
+                return false
+            }
+            append(lines)
             return true
         }
         droppedTymeFile = url

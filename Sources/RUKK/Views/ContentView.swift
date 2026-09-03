@@ -20,6 +20,8 @@ struct ContentView: View {
     @State private var selectedContact: Contact?
     /// Viðskiptavinur sem var rétt í þessu stofnaður — fær innflutningsvalkost í dálki 2.
     @State private var newContactID: PersistentIdentifier?
+    /// Skilaboð þegar sending sem sleppt var hafði ekkert nýtt að bera.
+    @State private var dropMessage: String?
 
     /// Innflutningur viðskiptavina (xlsx / CSV / XML) — hér svo ⌘I virki óháð völdum
     /// flipa. Ferlið sjálft býr í `CustomerImportFlow`.
@@ -88,6 +90,26 @@ struct ContentView: View {
             sectionPicker
             sidebarList
         }
+        // Verkþáttur dreginn beint úr BLIZZ verður að nýjum reikningsdrögum.
+        .dropDestination(for: URL.self) { urls, _ in handleSidebarDrop(urls) }
+        .alert("Ekkert til að flytja inn",
+               isPresented: Binding(get: { dropMessage != nil }, set: { if !$0 { dropMessage = nil } }),
+               presenting: dropMessage) { _ in
+            Button("Í lagi", role: .cancel) { dropMessage = nil }
+        } message: { Text($0) }
+    }
+
+    /// Tekur við tímasendingu sem sleppt er á dálk 1 (BLIZZ-verkþáttur eða `.rukktime`
+    /// skrá) og býr til ný reikningsdrög úr órukkaðri vinnu.
+    private func handleSidebarDrop(_ urls: [URL]) -> Bool {
+        guard let url = urls.first(where: DroppedFile.isTimeExport),
+              let payload = InvoiceImport.payload(from: url) else { return false }
+        guard !payload.unbilledLines.isEmpty else {
+            dropMessage = String(localized: "Öll vinnan í sendingunni er þegar rukkuð.")
+            return false
+        }
+        importInvoice(payload)
+        return true
     }
 
     /// Listi valins hluta — eigin bygging svo þýðandinn ráði við tjáninguna.
@@ -263,7 +285,7 @@ struct ContentView: View {
            !customer.isEmpty {
             invoice.note = "Verkefni: \(customer)"
         }
-        for (i, line) in payload.lines.enumerated() {
+        for (i, line) in payload.unbilledLines.enumerated() {
             let item = LineItem(description: line.description,
                                 quantity: line.quantity,
                                 unitPrice: line.unitPrice,

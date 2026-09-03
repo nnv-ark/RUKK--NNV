@@ -129,3 +129,39 @@ final class LineItemOrderTests: XCTestCase {
         XCTAssertEqual(descriptions(invoice), ["A", "B"])
     }
 }
+
+/// Sendingar utanfrá (BLIZZ) mega bera rukkaða vinnu — hún á aldrei að rata á reikning.
+final class BilledLineFilterTests: XCTestCase {
+
+    private func payload(_ flags: [Bool?]) -> InvoiceImportPayload {
+        InvoiceImportPayload(
+            source: "blizz",
+            lines: flags.enumerated().map { i, billed in
+                InvoiceImportPayload.Line(description: "lína \(i)", quantity: 1,
+                                          unitPrice: 0, unit: "klst", billed: billed)
+            })
+    }
+
+    func testBilledLinesAreLeftBehind() {
+        let p = payload([false, true, false])
+        XCTAssertEqual(p.unbilledLines.map(\.description), ["lína 0", "lína 2"])
+    }
+
+    func testOlderSendingsWithoutTheFlagAreKept() {
+        // Eldri BLIZZ-útgáfur senda ekkert `billed` — þá er engu sleppt.
+        XCTAssertEqual(payload([nil, nil]).unbilledLines.count, 2)
+    }
+
+    func testAFullyBilledSendingHasNothingToImport() {
+        XCTAssertTrue(payload([true, true]).unbilledLines.isEmpty)
+    }
+
+    func testDecodingASendingWithoutTheFlag() throws {
+        let json = Data("""
+        {"version":1,"source":"blizz","lines":[{"description":"vinna","quantity":2,"unitPrice":0}]}
+        """.utf8)
+        let decoded = try JSONDecoder().decode(InvoiceImportPayload.self, from: json)
+        XCTAssertEqual(decoded.unbilledLines.count, 1)
+        XCTAssertNil(decoded.lines[0].billed)
+    }
+}

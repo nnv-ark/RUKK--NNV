@@ -8,6 +8,10 @@ struct InvoiceImportPayload: Codable, Equatable {
         let quantity: Decimal
         let unitPrice: Decimal
         var unit: String?       // t.d. "klst" — eingöngu til upplýsingar
+        /// Þegar sendandinn (BLIZZ) veit að vinnan er þegar rukkuð. RUKK sleppir
+        /// slíkum línum, svo dráttur sem ber með sér rukkaða vinnu skilar aðeins
+        /// því sem eftir stendur.
+        var billed: Bool?
     }
     var version: Int = 1
     var source: String?          // t.d. "tyme"
@@ -15,6 +19,9 @@ struct InvoiceImportPayload: Codable, Equatable {
     var customer: String?        // verkefnaheiti úr upprunanum (valkvætt)
     var estimate: Bool?          // true = búa til tilboð í stað reikningsdraga (BLIZZ „Senda tilboð“)
     var lines: [Line]
+
+    /// Línurnar sem eiga erindi á reikning — rukkuð vinna er skilin eftir.
+    var unbilledLines: [Line] { lines.filter { $0.billed != true } }
 }
 
 /// Les tvær gerðir af innflutningi í `InvoiceImportPayload`:
