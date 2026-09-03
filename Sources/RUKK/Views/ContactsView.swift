@@ -73,26 +73,19 @@ struct ContactsView: View {
         // Leit efst í dálki 1 — „Nýr viðskiptavinur" er fyrsta færslan í listanum
         // og innflutningur býðst í dálki 2 þegar nýr viðskiptavinur er stofnaður.
         .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
-                HStack(spacing: 6) {
-                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-                    TextField("Leita að viðskiptavini", text: $searchText)
-                        .textFieldStyle(.plain)
-                    if !searchText.isEmpty {
-                        Button { searchText = "" } label: {
-                            Image(systemName: "xmark.circle.fill")
-                        }
-                        .buttonStyle(.borderless)
-                        .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField("Leita að viðskiptavini", text: $searchText)
+                    .textFieldStyle(.plain)
+                if !searchText.isEmpty {
+                    Button { searchText = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
                     }
+                    .buttonStyle(.borderless)
+                    .foregroundStyle(.secondary)
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 7)
-                .padding(.bottom, 7)
-
-                Divider()
             }
-            .background(.bar)
+            .barHeader(horizontal: 10)
         }
     }
 

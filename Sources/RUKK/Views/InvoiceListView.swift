@@ -103,10 +103,7 @@ struct InvoiceListView: View {
                 }
             }
             .buttonStyle(.borderless)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(.bar)
-            .overlay(alignment: .bottom) { Divider() }
+            .barHeader()
         }
     }
 
@@ -212,12 +209,7 @@ struct StatusBadge: View {
     let status: InvoiceStatus
 
     var body: some View {
-        Text(status.label)
-            .font(.caption2)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(color.opacity(0.18), in: Capsule())
-            .foregroundStyle(color)
+        CapsuleTag(status.label, color: color)
     }
 
     private var color: Color {

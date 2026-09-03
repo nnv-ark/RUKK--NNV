@@ -207,10 +207,7 @@ struct ContentView: View {
         }
         .pickerStyle(.segmented)
         .labelsHidden()
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .barHeader(horizontal: 10, vertical: 6)
     }
 
     /// Opnar skráaval fyrir innflutning viðskiptavina (fer fyrst á Viðskiptavinir-flipann).
@@ -385,10 +382,7 @@ struct ContentView: View {
             }
             .menuStyle(.borderlessButton)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.bar)
-        .overlay(alignment: .bottom) { Divider() }
+        .barHeader(horizontal: 12, vertical: 8)
     }
 }
 

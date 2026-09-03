@@ -29,12 +29,12 @@ struct DashboardView: View {
                 kpiGrid
 
                 if !monthly.isEmpty {
-                    card("Sala eftir mánuðum") {
+                    Card(title: "Sala eftir mánuðum") {
                         salesChart.frame(height: 180)
                     }
                 }
 
-                card("Ógreiddir reikningar") {
+                Card(title: "Ógreiddir reikningar") {
                     unpaidList
                 }
             }
@@ -47,35 +47,16 @@ struct DashboardView: View {
 
     private var kpiGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 170), spacing: 12)], spacing: 12) {
-            kpi("Heildarupphæð", Money.format(total12, currencyCode: currency), "sum")
-            kpi("Innheimt", Money.format(collected12, currencyCode: currency), "checkmark.circle", .green)
-            kpi("Útistandandi", Money.format(outstanding12, currencyCode: currency), "clock", outstanding12 > 0 ? .orange : .secondary)
-            kpi("Gjaldfallið", Money.format(overdueTotal, currencyCode: currency), "exclamationmark.triangle", overdueTotal > 0 ? .red : .secondary)
-            kpi("Innheimtuhlutfall", collectionRateText, "percent")
-            kpi("Greiðsluhraði", avgPaymentText, "speedometer")
+            KPITile(title: "Heildarupphæð", value: Money.format(total12, currencyCode: currency), icon: "sum")
+            KPITile(title: "Innheimt", value: Money.format(collected12, currencyCode: currency),
+                    icon: "checkmark.circle", tint: .green)
+            KPITile(title: "Útistandandi", value: Money.format(outstanding12, currencyCode: currency),
+                    icon: "clock", tint: outstanding12 > 0 ? .orange : .secondary)
+            KPITile(title: "Gjaldfallið", value: Money.format(overdueTotal, currencyCode: currency),
+                    icon: "exclamationmark.triangle", tint: overdueTotal > 0 ? .red : .secondary)
+            KPITile(title: "Innheimtuhlutfall", value: collectionRateText, icon: "percent")
+            KPITile(title: "Greiðsluhraði", value: avgPaymentText, icon: "speedometer")
         }
-    }
-
-    private func kpi(_ title: LocalizedStringKey, _ value: String, _ icon: String, _ tint: Color = .accentColor) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: icon)
-                .font(.caption).foregroundStyle(.secondary).labelStyle(.titleAndIcon)
-            Text(value).font(.title3).bold().foregroundStyle(tint)
-                .monospacedDigit().lineLimit(1).minimumScaleFactor(0.6)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func card<Content: View>(_ title: LocalizedStringKey, @ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(title).font(.headline)
-            content()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(16)
-        .background(.quaternary.opacity(0.3), in: RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Chart
@@ -85,12 +66,7 @@ struct DashboardView: View {
             BarMark(x: .value(String(localized: "Mánuður"), item.label), y: .value(String(localized: "Sala"), item.totalDouble))
                 .foregroundStyle(.tint)
         }
-        .chartYAxis {
-            AxisMarks { value in
-                AxisGridLine()
-                AxisValueLabel { if let d = value.as(Double.self) { Text(compact(d)) } }
-            }
-        }
+        .compactAmountAxis()
     }
 
     // MARK: - Unpaid list
@@ -124,11 +100,7 @@ struct DashboardView: View {
     private func dueTag(_ inv: Invoice) -> some View {
         if let due = inv.dueDate {
             let overdue = due < Date()
-            Text(due.formatted(date: .numeric, time: .omitted))
-                .font(.caption2)
-                .padding(.horizontal, 6).padding(.vertical, 2)
-                .background((overdue ? Color.red : Color.orange).opacity(0.18), in: Capsule())
-                .foregroundStyle(overdue ? .red : .orange)
+            CapsuleTag(due.formatted(date: .numeric, time: .omitted), color: overdue ? .red : .orange)
         }
     }
 
@@ -186,9 +158,4 @@ struct DashboardView: View {
             .sorted { $0.key < $1.key }
     }
 
-    private func compact(_ d: Double) -> String {
-        if d >= 1_000_000 { return "\((d / 1_000_000).formatted(.number.precision(.fractionLength(0...1))))M" }
-        if d >= 1_000 { return "\(Int(d / 1_000))k" }
-        return "\(Int(d))"
-    }
 }

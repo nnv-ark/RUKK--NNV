@@ -118,32 +118,17 @@ struct CustomerDetailView: View {
 
     private var kpiGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: 12)], spacing: 12) {
-            kpi("Reikningar", "\(billedInvoices.count)", "doc.text")
-            kpi("Heildarupphæð", Money.format(totalAll, currencyCode: currency), "sum")
-            kpi("Greitt", Money.format(paidTotal, currencyCode: currency), "checkmark.circle", .green)
-            kpi("Útistandandi", Money.format(outstanding, currencyCode: currency), "clock", outstanding > 0 ? .orange : .secondary)
-            kpi("Greiðsluhraði", avgPaymentText, "speedometer")
-            kpi("Gjaldfallið", "\(overdueCount)", "exclamationmark.triangle", overdueCount > 0 ? .red : .secondary)
+            KPITile(title: "Reikningar", value: "\(billedInvoices.count)", icon: "doc.text")
+            KPITile(title: "Heildarupphæð", value: Money.format(totalAll, currencyCode: currency), icon: "sum")
+            KPITile(title: "Greitt", value: Money.format(paidTotal, currencyCode: currency),
+                    icon: "checkmark.circle", tint: .green)
+            KPITile(title: "Útistandandi", value: Money.format(outstanding, currencyCode: currency),
+                    icon: "clock", tint: outstanding > 0 ? .orange : .secondary)
+            KPITile(title: "Greiðsluhraði", value: avgPaymentText, icon: "speedometer")
+            KPITile(title: "Gjaldfallið", value: "\(overdueCount)",
+                    icon: "exclamationmark.triangle", tint: overdueCount > 0 ? .red : .secondary)
         }
         .padding(.vertical, 4)
-    }
-
-    private func kpi(_ title: LocalizedStringKey, _ value: String, _ icon: String, _ tint: Color = .accentColor) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(title, systemImage: icon)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .labelStyle(.titleAndIcon)
-            Text(value)
-                .font(.title3).bold()
-                .foregroundStyle(tint)
-                .monospacedDigit()
-                .lineLimit(1)
-                .minimumScaleFactor(0.6)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - Yearly chart
@@ -160,16 +145,7 @@ struct CustomerDetailView: View {
                     .font(.caption2).foregroundStyle(.secondary)
             }
         }
-        .chartYAxis {
-            AxisMarks { value in
-                AxisGridLine()
-                AxisValueLabel {
-                    if let d = value.as(Double.self) {
-                        Text(compact(d))
-                    }
-                }
-            }
-        }
+        .compactAmountAxis()
     }
 
     // MARK: - Metrics
@@ -210,12 +186,4 @@ struct CustomerDetailView: View {
             .sorted { $0.year < $1.year }
     }
 
-    private func compact(_ d: Double) -> String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.maximumFractionDigits = 0
-        if d >= 1_000_000 { return "\((d / 1_000_000).formatted(.number.precision(.fractionLength(0...1))))M" }
-        if d >= 1_000 { return "\(Int(d / 1_000))k" }
-        return f.string(from: d as NSNumber) ?? "\(Int(d))"
-    }
 }
