@@ -141,27 +141,12 @@ struct InvoiceDetailView: View {
                 dropError = String(localized: "Öll vinnan í sendingunni er þegar rukkuð.")
                 return false
             }
-            append(lines)
+            invoice.append(lines, in: context)
             return true
         }
         droppedTymeFile = url
         showingTymeImport = true
         return true
-    }
-
-    private func append(_ lines: [InvoiceImportPayload.Line]) {
-        var next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
-        for line in lines {
-            let item = LineItem(description: line.description,
-                                quantity: line.quantity,
-                                unitPrice: line.unitPrice,
-                                taxRate: invoice.taxRate,
-                                order: next)
-            item.invoice = invoice
-            invoice.lineItems.append(item)
-            context.insert(item)
-            next += 1
-        }
     }
 
     private var form: some View {
@@ -304,6 +289,16 @@ struct InvoiceDetailView: View {
                 } label: {
                     Label("Bæta við línu", systemImage: "plus")
                 }
+                Button {
+                    let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
+                    let heading = LineItem.heading("", order: next)
+                    heading.invoice = invoice
+                    invoice.lineItems.append(heading)
+                    context.insert(heading)
+                } label: {
+                    Label("Bæta við fyrirsögn", systemImage: "text.alignleft")
+                }
+                .help("Skiptir reikningnum í kafla — telur ekki með í upphæðum")
                 if !lineHistory.isEmpty {
                     Menu {
                         ForEach(lineHistory, id: \.self) { entry in
@@ -472,6 +467,23 @@ private struct LineItemRow: View {
     @Bindable var item: LineItem
 
     var body: some View {
+        if item.isHeading { headingRow } else { amountRow }
+    }
+
+    /// Kaflaskil: aðeins heitið, engar tölur.
+    private var headingRow: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "text.alignleft")
+                .foregroundStyle(.secondary)
+                .help("Fyrirsögn — telur ekki með í upphæðum")
+            TextField("Fyrirsögn", text: $item.itemDescription)
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .font(.headline)
+        }
+    }
+
+    private var amountRow: some View {
         HStack(spacing: 8) {
             TextField("Lýsing", text: $item.itemDescription)
                 .labelsHidden()

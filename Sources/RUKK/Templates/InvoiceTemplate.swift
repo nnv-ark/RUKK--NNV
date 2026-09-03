@@ -223,12 +223,21 @@ struct InvoicePage: View {
             Divider()
 
             ForEach(invoice.orderedItems) { item in
-                HStack(alignment: .top, spacing: 8) {
-                    ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
-                        col(column.value(item, s), width: column.width, align: column.alignment)
+                if item.isHeading {
+                    // Kaflaskil: heiti verkþáttar yfir línunum sem tilheyra honum.
+                    Text(item.itemDescription)
+                        .bold()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 12)
+                        .padding(.bottom, 2)
+                } else {
+                    HStack(alignment: .top, spacing: 8) {
+                        ForEach(Array(columns.enumerated()), id: \.offset) { _, column in
+                            col(column.value(item, s), width: column.width, align: column.alignment)
+                        }
                     }
+                    .padding(.vertical, 6)
                 }
-                .padding(.vertical, 6)
             }
         }
     }

@@ -12,6 +12,8 @@ struct InvoiceImportPayload: Codable, Equatable {
         /// slíkum línum, svo dráttur sem ber með sér rukkaða vinnu skilar aðeins
         /// því sem eftir stendur.
         var billed: Bool?
+        /// Kaflaskil frekar en gjaldlína — t.d. heiti verkþáttar úr BLIZZ.
+        var heading: Bool?
     }
     var version: Int = 1
     var source: String?          // t.d. "tyme"
@@ -21,7 +23,15 @@ struct InvoiceImportPayload: Codable, Equatable {
     var lines: [Line]
 
     /// Línurnar sem eiga erindi á reikning — rukkuð vinna er skilin eftir.
-    var unbilledLines: [Line] { lines.filter { $0.billed != true } }
+    var unbilledLines: [Line] {
+        let kept = lines.filter { $0.billed != true }
+        // Fyrirsögn sem engin gjaldlína fylgir lengur á ekkert erindi á reikninginn.
+        return kept.enumerated().filter { i, line in
+            guard line.heading == true else { return true }
+            guard let next = kept[(i + 1)...].first else { return false }
+            return next.heading != true
+        }.map(\.element)
+    }
 }
 
 /// Les tvær gerðir af innflutningi í `InvoiceImportPayload`:

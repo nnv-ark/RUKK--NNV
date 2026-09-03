@@ -210,7 +210,8 @@ enum UBLInvoiceExporter {
 
     private static func invoiceLines(_ b: inout XMLBuilder, _ invoice: Invoice) {
         let cur = invoice.currencyCode
-        for (idx, item) in invoice.orderedItems.enumerated() {
+        // Fyrirsagnir eru útlit, ekki gjaldlínur — þær fara ekki í rafrænan reikning.
+        for (idx, item) in invoice.orderedItems.filter({ !$0.isHeading }).enumerated() {
             b.open("cac:InvoiceLine")
             b.el("cbc:ID", "\(idx + 1)")
             b.el("cbc:InvoicedQuantity", quantity(item.quantity), attrs: ["unitCode": "C62"])

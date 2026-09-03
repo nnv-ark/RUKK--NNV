@@ -93,6 +93,25 @@ final class Invoice {
     /// Hefur reikningurinn fengið fast útgáfunúmer?
     var isIssued: Bool { isNumberLocked && !number.trimmingCharacters(in: .whitespaces).isEmpty }
 
+    /// Bætir línum úr utanaðkomandi sendingu (BLIZZ, Tyme) aftast á reikninginn.
+    @MainActor
+    func append(_ lines: [InvoiceImportPayload.Line], in context: ModelContext) {
+        var next = (lineItems.map(\.order).max() ?? -1) + 1
+        for line in lines {
+            let item = line.heading == true
+                ? LineItem.heading(line.description, order: next)
+                : LineItem(description: line.description,
+                           quantity: line.quantity,
+                           unitPrice: line.unitPrice,
+                           taxRate: taxRate,
+                           order: next)
+            item.invoice = self
+            lineItems.append(item)
+            context.insert(item)
+            next += 1
+        }
+    }
+
     /// Færir línu á nýjan stað í listanum og endurnúmerar `order` samfellt (0, 1, 2 …).
     /// `to` er staðan sem línan á að taka í listanum eins og hann var fyrir færsluna.
     @discardableResult
@@ -231,8 +250,11 @@ final class Invoice {
         lineItems.sorted { $0.order < $1.order }
     }
 
+    /// Línur sem bera upphæð — fyrirsagnir eru aðeins texti og telja hvergi með.
+    var billableItems: [LineItem] { lineItems.filter { !$0.isHeading } }
+
     var subtotal: Decimal {                                  // samtals án VSK
-        lineItems.reduce(0) { $0 + $1.subtotal }
+        billableItems.reduce(0) { $0 + $1.subtotal }
     }
 
     /// Afsláttur (prósenta af undirsamtölu) dreifist hlutfallslega á allar VSK-línur.
@@ -252,7 +274,7 @@ final class Invoice {
     /// Línusamtölur (án VSK, FYRIR afslátt) flokkað eftir VSK-hlutfalli.
     /// Notað fyrir skjals-afslátt í UBL (AllowanceCharge per skattflokk).
     var lineNetByRate: [(rate: Decimal, net: Decimal)] {
-        Dictionary(grouping: lineItems, by: { $0.taxRate })
+        Dictionary(grouping: billableItems, by: { $0.taxRate })
             .map { rate, items in (rate, items.reduce(Decimal(0)) { $0 + $1.subtotal }) }
             .sorted { $0.rate < $1.rate }
     }

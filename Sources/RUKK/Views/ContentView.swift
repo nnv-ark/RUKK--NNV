@@ -35,6 +35,9 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
         } detail: {
             detail
+                // Verkþáttur dreginn úr BLIZZ: bætist á opinn reikning, annars
+                // verða til ný drög. Gildir um allan dálkinn — líka auðan.
+                .dropDestination(for: URL.self) { urls, _ in handleTimeDrop(urls) }
         }
         .toolbar {
             // Ósýnilegt atriði sem heldur tækjastikunni í fullri hæð líka þar sem engir
@@ -99,18 +102,26 @@ struct ContentView: View {
         } message: { Text($0) }
     }
 
-    /// Tekur við tímasendingu sem sleppt er á dálk 1 (BLIZZ-verkþáttur eða `.rukktime`
-    /// skrá) og býr til ný reikningsdrög úr órukkaðri vinnu.
-    private func handleSidebarDrop(_ urls: [URL]) -> Bool {
+    /// Tekur við tímasendingu sem sleppt er á RUKK — verkþætti dregnum úr BLIZZ eða
+    /// `.rukktime` skrá. Er reikningur opinn bætast línurnar á hann; annars verða til
+    /// ný drög. Rukkuð vinna fylgir aldrei með.
+    private func handleTimeDrop(_ urls: [URL]) -> Bool {
         guard let url = urls.first(where: DroppedFile.isTimeExport),
               let payload = InvoiceImport.payload(from: url) else { return false }
-        guard !payload.unbilledLines.isEmpty else {
+        let lines = payload.unbilledLines
+        guard !lines.isEmpty else {
             dropMessage = String(localized: "Öll vinnan í sendingunni er þegar rukkuð.")
             return false
         }
-        importInvoice(payload)
+        if let open = selectedInvoice, selection == .invoices || selection == .estimates {
+            open.append(lines, in: context)
+        } else {
+            importInvoice(payload)
+        }
         return true
     }
+
+    private func handleSidebarDrop(_ urls: [URL]) -> Bool { handleTimeDrop(urls) }
 
     /// Listi valins hluta — eigin bygging svo þýðandinn ráði við tjáninguna.
     @ViewBuilder
@@ -285,16 +296,7 @@ struct ContentView: View {
            !customer.isEmpty {
             invoice.note = "Verkefni: \(customer)"
         }
-        for (i, line) in payload.unbilledLines.enumerated() {
-            let item = LineItem(description: line.description,
-                                quantity: line.quantity,
-                                unitPrice: line.unitPrice,
-                                taxRate: invoice.taxRate,
-                                order: i)
-            item.invoice = invoice
-            invoice.lineItems.append(item)
-            context.insert(item)
-        }
+        invoice.append(payload.unbilledLines, in: context)
         selection = isEstimate ? .estimates : .invoices
         selectedInvoice = invoice
         inbox.pending = nil

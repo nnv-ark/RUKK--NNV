@@ -165,3 +165,60 @@ final class BilledLineFilterTests: XCTestCase {
         XCTAssertNil(decoded.lines[0].billed)
     }
 }
+
+/// Fyrirsagnarlínur: kaflaskil sem mega hvergi hafa áhrif á upphæðir.
+final class HeadingLineTests: XCTestCase {
+
+    @MainActor
+    private func invoice() throws -> (Invoice, ModelContainer, ModelContext) {
+        let container = try ModelContainer(
+            for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let company = AppSettings()
+        container.mainContext.insert(company)
+        return (Invoice.makeNext(in: container.mainContext, company: company),
+                container, container.mainContext)
+    }
+
+    @MainActor func testAHeadingAddsNothingToTheTotals() throws {
+        let (invoice, container, context) = try invoice()
+        defer { _ = container }
+        invoice.append([
+            .init(description: "GLUGGI Í KJALLARA", quantity: 0, unitPrice: 0, heading: true),
+            .init(description: "teikningar", quantity: 2, unitPrice: 10_000),
+        ], in: context)
+
+        XCTAssertEqual(invoice.subtotal, 20_000)
+        XCTAssertEqual(invoice.vatBreakdown.count, 1, "fyrirsögn á ekki að búa til nýjan VSK-flokk")
+        XCTAssertEqual(invoice.orderedItems.count, 2)
+        XCTAssertTrue(invoice.orderedItems[0].isHeading)
+    }
+
+    @MainActor func testTwoTasksKeepTheirOwnHeadings() throws {
+        let (invoice, container, context) = try invoice()
+        defer { _ = container }
+        invoice.append([
+            .init(description: "VERK A", quantity: 0, unitPrice: 0, heading: true),
+            .init(description: "vinna 1", quantity: 1, unitPrice: 1000),
+        ], in: context)
+        invoice.append([
+            .init(description: "VERK B", quantity: 0, unitPrice: 0, heading: true),
+            .init(description: "vinna 2", quantity: 1, unitPrice: 2000),
+        ], in: context)
+
+        XCTAssertEqual(invoice.orderedItems.map(\.itemDescription),
+                       ["VERK A", "vinna 1", "VERK B", "vinna 2"])
+        XCTAssertEqual(invoice.subtotal, 3000)
+    }
+
+    func testAHeadingWhoseWorkIsAllBilledIsDropped() {
+        // Öll vinnan undir fyrirsögninni er rukkuð — fyrirsögnin á þá ekkert erindi.
+        let payload = InvoiceImportPayload(lines: [
+            .init(description: "VERK A", quantity: 0, unitPrice: 0, heading: true),
+            .init(description: "rukkað", quantity: 1, unitPrice: 100, billed: true),
+            .init(description: "VERK B", quantity: 0, unitPrice: 0, heading: true),
+            .init(description: "órukkað", quantity: 1, unitPrice: 100),
+        ])
+        XCTAssertEqual(payload.unbilledLines.map(\.description), ["VERK B", "órukkað"])
+    }
+}
