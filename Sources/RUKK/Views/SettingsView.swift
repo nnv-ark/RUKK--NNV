@@ -146,6 +146,7 @@ private struct ProfileTab: View {
 private struct LogoPicker: View {
     @Binding var data: Data?
     @Environment(\.colorScheme) private var colorScheme
+    @State private var isDropTarget = false
 
     var body: some View {
         HStack(spacing: 12) {
@@ -168,13 +169,25 @@ private struct LogoPicker: View {
             .background(data != nil && colorScheme == .dark ? Color.white.opacity(0.92) : .clear,
                         in: RoundedRectangle(cornerRadius: 6))
             .clipShape(RoundedRectangle(cornerRadius: 6))
+            // Draga mynd beint á reitinn í stað þess að fara gegnum „Velja mynd…“.
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(isDropTarget ? Color.accentColor : .clear, lineWidth: 2)
+            }
+            .dropDestination(for: URL.self) { urls, _ in
+                guard let url = urls.first(where: DroppedFile.isImage),
+                      let dropped = DroppedFile.data(at: url),
+                      NSImage(data: dropped) != nil else { return false }
+                data = dropped
+                return true
+            } isTargeted: { isDropTarget = $0 }
 
             VStack(alignment: .leading, spacing: 6) {
                 Button("Velja mynd…", action: choose)
                 if data != nil {
                     Button("Fjarlægja", role: .destructive) { data = nil }
                 }
-                Text("PNG, JPEG eða SVG. Birtist efst á hverjum reikningi.")
+                Text("PNG, JPEG eða SVG — eða dragðu mynd á reitinn. Birtist efst á hverjum reikningi.")
                     .font(.caption).foregroundStyle(.secondary)
             }
         }

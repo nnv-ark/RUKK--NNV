@@ -220,16 +220,28 @@ final class CustomerImportFlow {
     var fileName = ""
     var error: String?
 
-    var fileTypes: [UTType] {
-        var types: [UTType] = [.commaSeparatedText, .xml]
-        if let xlsx = UTType(filenameExtension: "xlsx") { types.append(xlsx) }
-        if let tsv = UTType(filenameExtension: "tsv") { types.append(tsv) }
-        return types
-    }
+    var fileTypes: [UTType] { UTType.customerListTypes }
 
     func begin() {
         error = nil
         isChoosingFile = true
+    }
+
+    /// Les skrá sem notandi sleppti og opnar yfirferðina beint.
+    @discardableResult
+    func open(_ url: URL) -> Bool {
+        error = nil
+        do {
+            let needsStop = url.startAccessingSecurityScopedResource()
+            defer { if needsStop { url.stopAccessingSecurityScopedResource() } }
+            records = try CustomerImport.records(from: url)
+            fileName = url.lastPathComponent
+            isReviewing = true
+            return true
+        } catch {
+            self.error = error.localizedDescription
+            return false
+        }
     }
 
     func handle(_ result: Result<[URL], Error>) {

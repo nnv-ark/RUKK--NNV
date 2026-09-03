@@ -37,6 +37,9 @@ struct InvoiceDetailView: View {
     @State private var showingCalendarImport = false
     @State private var showingTymeImport = false
     @State private var showingBlizzImport = false
+    /// Skrá sem var sleppt á reikninginn og bíður þess að vera lesin.
+    @State private var droppedTymeFile: URL?
+    @State private var dropError: String?
 
     /// Tómt fyrirtæki til vara — býr til EITT eintak fyrir allt forritið. Áður varð
     /// til nýtt `AppSettings`-líkan í hverri teikningu þegar keðjan hitti ekki.
@@ -117,10 +120,42 @@ struct InvoiceDetailView: View {
             CalendarImportView(invoice: invoice)
         }
         .sheet(isPresented: $showingTymeImport) {
-            TymeImportView(invoice: invoice)
+            TymeImportView(invoice: invoice, initialFile: droppedTymeFile)
         }
         .sheet(isPresented: $showingBlizzImport) {
             BlizzImportView(invoice: invoice)
+        }
+    }
+
+    /// Tekur við tímaskrám sem sleppt er á reikninginn: Tyme-JSON opnar valgluggann
+    /// með skrána tilbúna, BLIZZ-sending (.rukktime) bætir línunum sínum beint við.
+    private func handleDrop(_ urls: [URL]) -> Bool {
+        guard let url = urls.first(where: DroppedFile.isTimeExport) else { return false }
+        if url.pathExtension.lowercased() == "rukktime" {
+            guard let payload = InvoiceImport.payload(from: url) else {
+                dropError = String(localized: "Skráin inniheldur engar línur sem RUKK skilur.")
+                return false
+            }
+            append(payload.lines)
+            return true
+        }
+        droppedTymeFile = url
+        showingTymeImport = true
+        return true
+    }
+
+    private func append(_ lines: [InvoiceImportPayload.Line]) {
+        var next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
+        for line in lines {
+            let item = LineItem(description: line.description,
+                                quantity: line.quantity,
+                                unitPrice: line.unitPrice,
+                                taxRate: invoice.taxRate,
+                                order: next)
+            item.invoice = invoice
+            invoice.lineItems.append(item)
+            context.insert(item)
+            next += 1
         }
     }
 
@@ -225,8 +260,17 @@ struct InvoiceDetailView: View {
             .disabled(invoice.isNumberLocked)
 
             Section("Línur") {
-                ForEach(invoice.orderedItems) { item in
+                ForEach(Array(invoice.orderedItems.enumerated()), id: \.element.persistentModelID) { index, item in
                     LineItemRow(item: item)
+                        // Draga línu upp eða niður; valmyndin er áfram til vara.
+                        .draggable(LineItemDrag(index: index)) {
+                            Text(item.itemDescription.isEmpty
+                                 ? String(localized: "Lína") : item.itemDescription)
+                        }
+                        .dropDestination(for: LineItemDrag.self) { dragged, _ in
+                            guard let from = dragged.first?.index else { return false }
+                            return invoice.moveItem(from: from, to: index)
+                        }
                         .contextMenu {
                             Button("Afrita") {
                                 let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
@@ -311,6 +355,12 @@ struct InvoiceDetailView: View {
             }
         }
         .formStyle(.grouped)
+        .dropDestination(for: URL.self) { urls, _ in handleDrop(urls) }
+        .alert("Innflutningur mistókst",
+               isPresented: Binding(get: { dropError != nil }, set: { if !$0 { dropError = nil } }),
+               presenting: dropError) { _ in
+            Button("Í lagi", role: .cancel) { dropError = nil }
+        } message: { Text($0) }
     }
 
     /// Stækkun forskoðunar. „Passa" skalar síðuna eftir breidd dálksins svo hún
@@ -408,14 +458,8 @@ struct InvoiceDetailView: View {
     }
 
     private func move(item: LineItem, by delta: Int) {
-        let ordered = invoice.orderedItems
-        guard let idx = ordered.firstIndex(of: item) else { return }
-        let newIdx = idx + delta
-        guard ordered.indices.contains(newIdx) else { return }
-        let other = ordered[newIdx]
-        let tmp = item.order
-        item.order = other.order
-        other.order = tmp
+        guard let idx = invoice.orderedItems.firstIndex(of: item) else { return }
+        invoice.moveItem(from: idx, to: idx + delta)
     }
 }
 

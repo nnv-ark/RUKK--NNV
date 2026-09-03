@@ -70,3 +70,62 @@ final class ImportFixTests: XCTestCase {
         XCTAssertEqual(amount, "1234567.89")
     }
 }
+
+/// Röðun reikningslína — undirstaða þess að draga línu til í viðmótinu.
+final class LineItemOrderTests: XCTestCase {
+
+    /// Gámurinn verður að lifa jafn lengi og reikningurinn — annars eyðir SwiftData
+    /// líkönunum um leið og hann fer úr gildissviði.
+    @MainActor
+    private func invoiceWithLines(_ names: [String]) throws -> (Invoice, ModelContainer) {
+        let container = try ModelContainer(
+            for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self,
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true))
+        let context = container.mainContext
+        let company = AppSettings()
+        context.insert(company)
+        let invoice = Invoice.makeNext(in: context, company: company)
+        for (i, name) in names.enumerated() {
+            let item = LineItem(description: name, order: i)
+            item.invoice = invoice
+            invoice.lineItems.append(item)
+            context.insert(item)
+        }
+        return (invoice, container)
+    }
+
+    private func descriptions(_ invoice: Invoice) -> [String] {
+        invoice.orderedItems.map(\.itemDescription)
+    }
+
+    @MainActor func testMovingALineDown() throws {
+        let (invoice, container) = try invoiceWithLines(["A", "B", "C", "D"])
+        defer { _ = container }
+        XCTAssertTrue(invoice.moveItem(from: 0, to: 2))
+        XCTAssertEqual(descriptions(invoice), ["B", "C", "A", "D"])
+    }
+
+    @MainActor func testMovingALineUp() throws {
+        let (invoice, container) = try invoiceWithLines(["A", "B", "C", "D"])
+        defer { _ = container }
+        XCTAssertTrue(invoice.moveItem(from: 3, to: 1))
+        XCTAssertEqual(descriptions(invoice), ["A", "D", "B", "C"])
+    }
+
+    @MainActor func testOrderIsRenumberedContiguously() throws {
+        let (invoice, container) = try invoiceWithLines(["A", "B", "C"])
+        defer { _ = container }
+        invoice.moveItem(from: 2, to: 0)
+        XCTAssertEqual(invoice.orderedItems.map(\.order), [0, 1, 2],
+                       "order á að vera samfellt eftir færslu, annars skarast nýjar línur")
+    }
+
+    @MainActor func testOutOfRangeAndNoOpMovesAreRejected() throws {
+        let (invoice, container) = try invoiceWithLines(["A", "B"])
+        defer { _ = container }
+        XCTAssertFalse(invoice.moveItem(from: 1, to: 1))
+        XCTAssertFalse(invoice.moveItem(from: 0, to: 5))
+        XCTAssertFalse(invoice.moveItem(from: -1, to: 0))
+        XCTAssertEqual(descriptions(invoice), ["A", "B"])
+    }
+}

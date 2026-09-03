@@ -6,6 +6,8 @@ import UniformTypeIdentifiers
 /// reikninginn sem línur (lýsing = athugasemd, magn = klst., einingarverð = taxti úr Tyme).
 struct TymeImportView: View {
     @Bindable var invoice: Invoice
+    /// Skrá sem var sleppt á reikninginn — lesin um leið og glugginn opnast.
+    var initialFile: URL?
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
@@ -32,7 +34,13 @@ struct TymeImportView: View {
         .fileImporter(isPresented: $showingPicker,
                       allowedContentTypes: [.json],
                       allowsMultipleSelection: false) { result in
-            load(result)
+            switch result {
+            case .success(let urls): if let url = urls.first { load(url) }
+            case .failure(let e):    error = e.localizedDescription
+            }
+        }
+        .task {
+            if let initialFile { load(initialFile) }
         }
     }
 
@@ -111,13 +119,12 @@ struct TymeImportView: View {
 
     // MARK: - Logic
 
-    private func load(_ result: Result<[URL], Error>) {
+    private func load(_ url: URL) {
         error = nil
         do {
-            guard let url = try result.get().first else { return }
-            let needsStop = url.startAccessingSecurityScopedResource()
-            defer { if needsStop { url.stopAccessingSecurityScopedResource() } }
-            let data = try Data(contentsOf: url)
+            guard let data = DroppedFile.data(at: url) else {
+                throw CocoaError(.fileReadNoSuchFile)
+            }
             let parsed = TymeImporter.parse(data)
             guard !parsed.isEmpty else {
                 error = String(localized: "Engar tímafærslur fundust í skránni.")

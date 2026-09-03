@@ -106,10 +106,11 @@ struct ContentView: View {
                 InvoiceListView(company: company, selection: $selectedInvoice, estimatesOnly: true)
                     .id(company.id)
             case .contacts:
-                ContactsView(company: company, selection: $selectedContact) { created in
-                    newContactID = created.id
-                }
-                .id(company.id)
+                ContactsView(company: company,
+                             selection: $selectedContact,
+                             onCreate: { newContactID = $0.id },
+                             onDropFile: { customerImport.open($0) })
+                    .id(company.id)
             }
         } else {
             ProgressView()

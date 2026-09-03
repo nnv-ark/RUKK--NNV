@@ -11,10 +11,16 @@ struct ContactsView: View {
     /// Ræst þegar nýr viðskiptavinur verður til — dálkur 2 býður þá innflutning
     /// sem valkost við handvirka innslátt.
     private let onCreate: (Contact) -> Void
+    /// Skrá með viðskiptavinum sem var sleppt á listann.
+    private let onDropFile: (URL) -> Bool
 
-    init(company: AppSettings, selection: Binding<Contact?>, onCreate: @escaping (Contact) -> Void = { _ in }) {
+    init(company: AppSettings,
+         selection: Binding<Contact?>,
+         onCreate: @escaping (Contact) -> Void = { _ in },
+         onDropFile: @escaping (URL) -> Bool = { _ in false }) {
         self.company = company
         self.onCreate = onCreate
+        self.onDropFile = onDropFile
         _selection = selection
         let cid = company.id
         _contacts = Query(filter: #Predicate<Contact> { $0.owner?.id == cid }, sort: \Contact.name)
@@ -70,6 +76,11 @@ struct ContactsView: View {
             }
         }
         .navigationTitle("Viðskiptavinir")
+        // Sleppa Excel-, CSV- eða XML-skrá hvar sem er á listanum til að flytja inn.
+        .dropDestination(for: URL.self) { urls, _ in
+            guard let url = urls.first(where: DroppedFile.isCustomerList) else { return false }
+            return onDropFile(url)
+        }
         // Leitin situr efst; „Nýr viðskiptavinur" er fyrsta færslan í listanum sjálfum.
         .safeAreaInset(edge: .top, spacing: 0) {
             HStack(spacing: 6) {

@@ -93,6 +93,18 @@ final class Invoice {
     /// Hefur reikningurinn fengið fast útgáfunúmer?
     var isIssued: Bool { isNumberLocked && !number.trimmingCharacters(in: .whitespaces).isEmpty }
 
+    /// Færir línu á nýjan stað í listanum og endurnúmerar `order` samfellt (0, 1, 2 …).
+    /// `to` er staðan sem línan á að taka í listanum eins og hann var fyrir færsluna.
+    @discardableResult
+    func moveItem(from: Int, to: Int) -> Bool {
+        var items = orderedItems
+        guard from != to, items.indices.contains(from), items.indices.contains(to) else { return false }
+        let moved = items.remove(at: from)
+        items.insert(moved, at: min(to, items.count))
+        for (i, item) in items.enumerated() { item.order = i }
+        return true
+    }
+
     /// Númer til birtingar í listum: reikningsnúmer, tilboðsnúmer, annars staðgengill.
     var displayNumber: String {
         let n = isEstimate ? estimateNumber : number

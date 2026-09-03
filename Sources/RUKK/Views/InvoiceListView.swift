@@ -26,6 +26,10 @@ struct InvoiceListView: View {
             ForEach(invoices) { invoice in
                 InvoiceRow(invoice: invoice)
                     .tag(invoice)
+                    // Draga reikninginn í Finder, Mail eða Skilaboð — PDF-ið er teiknað
+                    // þegar dráttur hefst, ekki þegar listinn er teiknaður.
+                    .draggable(InvoicePDFDrag(invoice: invoice,
+                                              settings: invoice.issuer ?? company))
                     .contextMenu {
                         if invoice.isEstimate {
                             Button("Breyta í reikning") { invoice.convertToInvoice() }
