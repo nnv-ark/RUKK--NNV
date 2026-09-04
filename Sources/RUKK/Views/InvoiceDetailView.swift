@@ -149,6 +149,64 @@ struct InvoiceDetailView: View {
         return true
     }
 
+    /// Ein rönd af táknum neðst í „Línur“ — bæta við línu, fyrirsögn, fyrri línu,
+    /// dagatali, Tyme, BLIZZ. Áður tók hver aðgerð heila breiða röð.
+    private var lineTools: some View {
+        HStack(spacing: 14) {
+            Button { addLine() } label: { Image(systemName: "plus") }
+                .help("Bæta við línu")
+
+            Button { addHeading() } label: { Image(systemName: "text.alignleft") }
+                .help("Bæta við fyrirsögn — skiptir reikningnum í kafla, telur ekki með í upphæðum")
+
+            if !lineHistory.isEmpty {
+                Menu {
+                    ForEach(lineHistory, id: \.self) { entry in
+                        Button(entry.description) { insertLine(from: entry) }
+                    }
+                } label: {
+                    Image(systemName: "clock.arrow.circlepath")
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .fixedSize()
+                .help("Nota fyrri línu úr eldri reikningum")
+            }
+
+            Divider().frame(height: 16)
+
+            Button { showingCalendarImport = true } label: { Image(systemName: "calendar") }
+                .help("Sækja úr dagatali")
+
+            Button { showingTymeImport = true } label: { Image(systemName: "clock") }
+                .help("Sækja úr Tyme")
+
+            Button { showingBlizzImport = true } label: { Image(systemName: "snowflake") }
+                .help("Sækja úr BLIZZ")
+
+            Spacer()
+        }
+        .buttonStyle(.borderless)
+        .imageScale(.large)
+        .padding(.vertical, 2)
+    }
+
+    private func addLine() {
+        let item = LineItem(taxRate: invoice.taxRate, order: nextLineOrder)
+        item.invoice = invoice
+        invoice.lineItems.append(item)
+        context.insert(item)
+    }
+
+    private func addHeading() {
+        let heading = LineItem.heading("", order: nextLineOrder)
+        heading.invoice = invoice
+        invoice.lineItems.append(heading)
+        context.insert(heading)
+    }
+
+    private var nextLineOrder: Int { (invoice.lineItems.map(\.order).max() ?? -1) + 1 }
+
     private var form: some View {
         Form {
             Section(invoice.isEstimate ? "Tilboð" : "Reikningur") {
@@ -241,10 +299,17 @@ struct InvoiceDetailView: View {
                 }
             }
 
-            Section("Móttakandi") {
+            Section {
                 Picker("Viðskiptavinur", selection: $invoice.recipient) {
                     Text("Velja").tag(Optional<Contact>.none)
                     ForEach(companyContacts) { Text($0.name).tag(Optional($0)) }
+                }
+                // Viðskiptanúmerið prentast á reikninginn; það á líka að sjást hér.
+                // Breyting hér uppfærir kennitölu viðskiptavinarins sjálfs.
+                if let recipient = invoice.recipient {
+                    TextField("Viðskiptanúmer",
+                              text: Binding(get: { recipient.nationalID },
+                                            set: { recipient.nationalID = $0 }))
                 }
             }
             .disabled(invoice.isNumberLocked)
@@ -280,50 +345,8 @@ struct InvoiceDetailView: View {
                         }
                 }
                 .onDelete(perform: deleteItems)
-                Button {
-                    let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
-                    let item = LineItem(taxRate: invoice.taxRate, order: next)
-                    item.invoice = invoice
-                    invoice.lineItems.append(item)
-                    context.insert(item)
-                } label: {
-                    Label("Bæta við línu", systemImage: "plus")
-                }
-                Button {
-                    let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
-                    let heading = LineItem.heading("", order: next)
-                    heading.invoice = invoice
-                    invoice.lineItems.append(heading)
-                    context.insert(heading)
-                } label: {
-                    Label("Bæta við fyrirsögn", systemImage: "text.alignleft")
-                }
-                .help("Skiptir reikningnum í kafla — telur ekki með í upphæðum")
-                if !lineHistory.isEmpty {
-                    Menu {
-                        ForEach(lineHistory, id: \.self) { entry in
-                            Button(entry.description) { insertLine(from: entry) }
-                        }
-                    } label: {
-                        Label("Nota fyrri línu…", systemImage: "clock.arrow.circlepath")
-                    }
-                    .help("Bætir við línu með lýsingu, verði og VSK úr eldri reikningum")
-                }
-                Button {
-                    showingCalendarImport = true
-                } label: {
-                    Label("Sækja úr dagatali", systemImage: "calendar")
-                }
-                Button {
-                    showingTymeImport = true
-                } label: {
-                    Label("Sækja úr Tyme", systemImage: "clock")
-                }
-                Button {
-                    showingBlizzImport = true
-                } label: {
-                    Label("Sækja úr BLIZZ", systemImage: "snowflake")
-                }
+
+                lineTools
             }
             .disabled(invoice.isNumberLocked)
 
@@ -449,9 +472,9 @@ struct InvoiceDetailView: View {
     }
 
     private func insertLine(from entry: HistoricLine) {
-        let next = (invoice.lineItems.map(\.order).max() ?? -1) + 1
         let item = LineItem(description: entry.description, quantity: 1,
-                            unitPrice: entry.unitPrice, taxRate: entry.taxRate, order: next)
+                            unitPrice: entry.unitPrice, taxRate: entry.taxRate,
+                            order: nextLineOrder)
         item.invoice = invoice
         invoice.lineItems.append(item)
         context.insert(item)
