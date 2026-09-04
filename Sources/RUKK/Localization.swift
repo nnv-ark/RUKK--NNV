@@ -70,6 +70,20 @@ struct InvoiceStrings {
 
     var notes: String { en ? "Notes" : "Athugasemdir" }
 
+    // Fjölblaðsíðu reikningar
+    func continuedOn(page: Int, of total: Int) -> String {
+        en ? "Continued on page \(page) of \(total) →"
+           : "Framhald á bls. \(page) af \(total) →"
+    }
+    func pageOf(_ page: Int, of total: Int) -> String {
+        en ? "Page \(page) of \(total)" : "Bls. \(page) af \(total)"
+    }
+    var continued: String { en ? "continued" : "framhald" }
+    /// Fylgiskjalið sem tekur við sundurliðuninni þegar hún kemst ekki á reikninginn.
+    var timeReport: String { en ? "Time report" : "Tímaskýrsla" }
+    var seeTimeReport: String { en ? "See time report" : "Sjá tímaskýrslu" }
+    var hours: String { en ? "Hours" : "Klst" }
+
     var footerLegal: String {
         en
         ? "This invoice is an external electronic source document pursuant to Icelandic Regulation No. 505/2013. The external electronic source document is deemed the original of the invoice."

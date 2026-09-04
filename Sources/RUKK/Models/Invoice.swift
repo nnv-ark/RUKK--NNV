@@ -271,6 +271,12 @@ final class Invoice {
 
     var total: Decimal { taxableBase + taxValue }            // samtals með VSK
 
+    /// Samtala línanna með VSK, fyrir afslátt — til að sýna í einu lagi á reikningi
+    /// sem vísar á tímaskýrslu.
+    var subtotalIncTaxTotal: Decimal {
+        billableItems.reduce(0) { $0 + $1.subtotalIncTax }
+    }
+
     /// Línusamtölur (án VSK, FYRIR afslátt) flokkað eftir VSK-hlutfalli.
     /// Notað fyrir skjals-afslátt í UBL (AllowanceCharge per skattflokk).
     var lineNetByRate: [(rate: Decimal, net: Decimal)] {

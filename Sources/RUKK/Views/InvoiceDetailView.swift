@@ -423,18 +423,27 @@ struct InvoiceDetailView: View {
             let fitted = min(max(geo.size.width - inset * 2, 1) / page.width, 1.5)
             let scale = previewZoom.factor ?? fitted
 
+            let pages = InvoiceRenderer.pages(for: invoice, settings: settings)
+            let gap: CGFloat = 16
+
             ScrollView(previewZoom == .fit ? .vertical : [.horizontal, .vertical]) {
-                InvoiceRenderer.view(for: invoice, settings: settings)
-                    .frame(width: page.width, height: page.height)
-                    .scaleEffect(scale, anchor: .topLeading)
-                    // Skölun ein og sér breytir ekki plássinu sem sýnin tekur —
-                    // ytri ramminn segir uppsetningunni raunstærð síðunnar.
-                    .frame(width: page.width * scale, height: page.height * scale,
-                           alignment: .topLeading)
-                    .border(Color(white: 0.85))
-                    .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
-                    .padding(inset)
-                    .frame(maxWidth: previewZoom == .fit ? .infinity : nil)   // miðjuð
+                VStack(spacing: gap) {
+                    ForEach(Array(pages.enumerated()), id: \.offset) { _, sheet in
+                        sheet
+                            .frame(width: page.width, height: page.height)
+                            .border(Color(white: 0.85))
+                            .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
+                    }
+                }
+                .scaleEffect(scale, anchor: .topLeading)
+                // Skölun ein og sér breytir ekki plássinu sem sýnin tekur —
+                // ytri ramminn segir uppsetningunni raunstærð blaðsíðnanna.
+                .frame(width: page.width * scale,
+                       height: (page.height * CGFloat(pages.count)
+                                + gap * CGFloat(max(0, pages.count - 1))) * scale,
+                       alignment: .topLeading)
+                .padding(inset)
+                .frame(maxWidth: previewZoom == .fit ? .infinity : nil)   // miðjuð
             }
             .scrollBounceBehavior(.basedOnSize)
         }

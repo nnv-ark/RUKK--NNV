@@ -8,9 +8,9 @@ private let pdfLog = Logger(subsystem: "is.calmail.kula", category: "pdf")
 @MainActor
 enum PDFRenderer {
 
-    /// PDF-gögn reikningsins með völdu sniðmáti.
+    /// PDF-gögn reikningsins með völdu sniðmáti — allar blaðsíður hans.
     static func pdfData(invoice: Invoice, settings: AppSettings) -> Data? {
-        data(from: InvoiceRenderer.view(for: invoice, settings: settings))
+        data(from: InvoiceRenderer.pages(for: invoice, settings: settings))
     }
 
     // MARK: - Page Setup / Print / Preview
@@ -112,23 +112,36 @@ enum PDFRenderer {
         }
     }
 
-    static func data<V: View>(from view: V) -> Data? {
-        let renderer = ImageRenderer(content: view)
-        // ImageRenderer.render's draw closure sets up the PDF coordinate system itself —
-        // do NOT add manual translate/scale flips or the page comes out upside-down + mirrored.
-        var result: Data?
-        renderer.render { size, draw in
-            let pageData = NSMutableData()
-            guard let consumer = CGDataConsumer(data: pageData) else { return }
-            var mediaBox = CGRect(origin: .zero, size: size)
-            guard let context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil) else { return }
-            context.beginPDFPage(nil)
-            draw(context)
-            context.endPDFPage()
-            context.closePDF()
-            result = pageData as Data
+    static func data<V: View>(from view: V) -> Data? { data(from: [view]) }
+
+    /// Teiknar hverja sýn sem eina blaðsíðu í einu og sama PDF-skjalinu.
+    static func data<V: View>(from views: [V]) -> Data? {
+        guard !views.isEmpty else { return nil }
+
+        let out = NSMutableData()
+        guard let consumer = CGDataConsumer(data: out) else { return nil }
+        // Stærð fyrstu síðunnar ræður mediaBox; allar síður reikningsins eru jafnstórar.
+        var context: CGContext?
+
+        for view in views {
+            let renderer = ImageRenderer(content: view)
+            // ImageRenderer.render's draw closure sets up the PDF coordinate system itself —
+            // do NOT add manual translate/scale flips or the page comes out upside-down + mirrored.
+            renderer.render { size, draw in
+                if context == nil {
+                    var mediaBox = CGRect(origin: .zero, size: size)
+                    context = CGContext(consumer: consumer, mediaBox: &mediaBox, nil)
+                }
+                guard let context else { return }
+                context.beginPDFPage(nil)
+                draw(context)
+                context.endPDFPage()
+            }
         }
-        return result
+
+        guard let context else { return nil }
+        context.closePDF()
+        return out as Data
     }
 
     static func export(invoice: Invoice, settings: AppSettings) {
