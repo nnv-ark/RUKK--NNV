@@ -54,6 +54,12 @@ struct InvoiceDetailView: View {
             ?? Self.unconfiguredCompany
     }
 
+    /// Kennitala viðtakandans. Tóm — og óvirk — meðan enginn viðskiptavinur er valinn.
+    private var customerNumber: Binding<String> {
+        Binding(get: { invoice.recipient?.nationalID ?? "" },
+                set: { invoice.recipient?.nationalID = $0 })
+    }
+
     private var dueDateBinding: Binding<Date> {
         Binding(get: { invoice.dueDate ?? invoice.issueDate },
                 set: { invoice.dueDate = $0 })
@@ -304,13 +310,13 @@ struct InvoiceDetailView: View {
                     Text("Velja").tag(Optional<Contact>.none)
                     ForEach(companyContacts) { Text($0.name).tag(Optional($0)) }
                 }
-                // Viðskiptanúmerið prentast á reikninginn; það á líka að sjást hér.
+                // Viðskiptanúmerið prentast á reikninginn og á því alltaf að hafa
+                // sína línu hér — líka áður en viðskiptavinur er valinn.
                 // Breyting hér uppfærir kennitölu viðskiptavinarins sjálfs.
-                if let recipient = invoice.recipient {
-                    TextField("Viðskiptanúmer",
-                              text: Binding(get: { recipient.nationalID },
-                                            set: { recipient.nationalID = $0 }))
-                }
+                TextField("Viðskiptanúmer", text: customerNumber,
+                          prompt: Text(invoice.recipient == nil
+                                       ? "veldu viðskiptavin fyrst" : "kennitala"))
+                    .disabled(invoice.recipient == nil)
             }
             .disabled(invoice.isNumberLocked)
 
