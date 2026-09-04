@@ -142,7 +142,9 @@ struct InvoicePage: View {
             qrCode
 
             Spacer(minLength: 16)
-            VStack(alignment: .trailing, spacing: 2) {
+            // Jafnt línubil alla leið — engin stök .padding milli valkvæðra lína,
+            // sem gerði bilin misstór eftir því hvaða reitir voru útfylltir.
+            VStack(alignment: .trailing, spacing: 4) {
                 // Röð: nafn → kt. → heimilisfang+sími → netfang → reikningsnr. → VSK-númer
                 Text(settings.companyName).font(font(15, weight: .bold))
                 if !settings.companyNationalID.isEmpty {
@@ -154,13 +156,13 @@ struct InvoicePage: View {
                     .compactMap { ($0?.isEmpty == false) ? $0 : nil }
                     .joined(separator: ", ")
                 if !addrLine.isEmpty {
-                    Text(addrLine).bold().padding(.top, 6)
+                    Text(addrLine).bold()
                 }
                 if !settings.companyEmail.isEmpty {
-                    Text(settings.companyEmail).padding(.top, 6)
+                    Text(settings.companyEmail)
                 }
                 if !settings.bankAccountNumber.isEmpty {
-                    Text(s.bankAccount(settings.bankAccountNumber)).padding(.top, 6)
+                    Text(s.bankAccount(settings.bankAccountNumber))
                 }
                 if !settings.companyVATNumber.isEmpty {
                     Text(s.vatNumber(settings.companyVATNumber))
