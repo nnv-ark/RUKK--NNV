@@ -33,6 +33,11 @@ the standard Icelandic format, and invoices can be exported as **PDF** or as a
   notes, and import from the macOS **Contacts** app.
 - **Export** — PDF, electronic invoice (UBL/TS-136 XML), or batch-export *all* invoices
   (PDF + XML) to a folder at once.
+- **Drag and drop** — drag a verkþáttur out of [BLIZZ](https://github.com/nnv-ark/BLIZZ) and
+  drop it on RUKK: only unbilled time comes across, each task arrives under its own heading,
+  and you get a draft invoice (or the lines are added to the invoice already open). Drag an
+  invoice out to Finder or Mail as a PDF, drag line items to reorder them, drop a customer
+  list or a logo where it belongs.
 - **Native macOS** — proper menu commands (⌘N, ⌘P, ⌘E …), Page Setup, print, "Open in Preview",
   email via Mail with the PDF attached, Settings scene, light/dark mode.
 - **Customisable** — logo, font family &amp; sizes, text colour, paper size (A4 / US Letter),
