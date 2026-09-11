@@ -32,7 +32,11 @@ struct InvoiceListView: View {
                                               settings: invoice.issuer ?? company))
                     .contextMenu {
                         if invoice.isEstimate {
-                            Button("Breyta í reikning") { invoice.convertToInvoice() }
+                            Button("Breyta í reikning") {
+                                invoice.convertToInvoice()
+                                // Hverfur úr tilboðslistanum — valið má ekki hanga eftir.
+                                if selection == invoice { selection = nil }
+                            }
                             Divider()
                         }
                         Button("Prenta…") {

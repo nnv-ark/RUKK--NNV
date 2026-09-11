@@ -268,6 +268,8 @@ struct InvoiceDetailView: View {
                 Section {
                     Button {
                         invoice.convertToInvoice()
+                        // Skjalið er ekki lengur tilboð — opnast í Reikninga-flipanum.
+                        onOpenInvoice(invoice)
                     } label: {
                         Label("Breyta í reikning", systemImage: "arrow.right.doc.fill")
                             .frame(maxWidth: .infinity)

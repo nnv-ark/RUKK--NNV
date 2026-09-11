@@ -16,7 +16,11 @@ struct ContentView: View {
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
     @AppStorage("kulaNormalizedV1") private var didNormalize = false
     @State private var selection: SidebarItem = .dashboard
+    /// Valinn reikningur í Reikninga-flipanum.
     @State private var selectedInvoice: Invoice?
+    /// Valið tilboð í Tilboða-flipanum — eigið val svo flipaskipti sýni aldrei
+    /// reikning í tilboðsflipanum (og öfugt).
+    @State private var selectedEstimate: Invoice?
     @State private var selectedContact: Contact?
     /// Viðskiptavinur sem var rétt í þessu stofnaður — fær innflutningsvalkost í dálki 2.
     @State private var newContactID: PersistentIdentifier?
@@ -65,6 +69,7 @@ struct ContentView: View {
         }
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
+            selectedEstimate = nil
             selectedContact = nil
             newContactID = nil
         }
@@ -113,7 +118,7 @@ struct ContentView: View {
             dropMessage = String(localized: "Öll vinnan í sendingunni er þegar rukkuð.")
             return false
         }
-        if let open = selectedInvoice, selection == .invoices || selection == .estimates {
+        if let open = openDocument, selection == .invoices || selection == .estimates {
             open.append(lines, in: context)
         } else {
             importInvoice(payload)
@@ -136,7 +141,7 @@ struct ContentView: View {
                 InvoiceListView(company: company, selection: $selectedInvoice)
                     .id(company.id)               // ný fyrirspurn þegar skipt er um fyrirtæki
             case .estimates:
-                InvoiceListView(company: company, selection: $selectedInvoice, estimatesOnly: true)
+                InvoiceListView(company: company, selection: $selectedEstimate, estimatesOnly: true)
                     .id(company.id)
             case .contacts:
                 ContactsView(company: company,
@@ -185,10 +190,17 @@ struct ContentView: View {
                                            description: Text("Veldu eða búðu til viðskiptavin."))
                 }
             default:
-                if let invoice = selectedInvoice {
-                    InvoiceDetailView(invoice: invoice) { newInvoice in
+                if let document = openDocument {
+                    InvoiceDetailView(invoice: document) { newInvoice in
+                        // Kreditreikningur — og tilboð sem varð að reikningi — eiga
+                        // heima í Reikninga-flipanum; færum valið þangað.
+                        if selectedEstimate == newInvoice { selectedEstimate = nil }
                         selectedInvoice = newInvoice
+                        selection = .invoices
                     }
+                } else if selection == .estimates {
+                    ContentUnavailableView("Ekkert tilboð valið", systemImage: "doc.append",
+                                           description: Text("Veldu eða búðu til tilboð."))
                 } else {
                     ContentUnavailableView("Ekkert valið", systemImage: "doc.text",
                                            description: Text("Veldu eða búðu til reikning."))
@@ -281,7 +293,7 @@ struct ContentView: View {
         let company = AppSettings.active(in: context, activeID: activeCompanyID)
         let estimate = Invoice.makeEstimate(in: context, company: company)
         selection = .estimates
-        selectedInvoice = estimate
+        selectedEstimate = estimate
     }
 
     /// Býr til drög-reikning — eða tilboð ef sendingin biður um það (`estimate: true`) —
@@ -298,8 +310,13 @@ struct ContentView: View {
         }
         invoice.append(payload.unbilledLines, in: context)
         selection = isEstimate ? .estimates : .invoices
-        selectedInvoice = invoice
+        if isEstimate { selectedEstimate = invoice } else { selectedInvoice = invoice }
         inbox.pending = nil
+    }
+
+    /// Skjalið sem dálkur 2 sýnir: tilboð í Tilboða-flipanum, annars reikningur.
+    private var openDocument: Invoice? {
+        selection == .estimates ? selectedEstimate : selectedInvoice
     }
 
     private var activeCompany: AppSettings? {
