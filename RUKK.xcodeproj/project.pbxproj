@@ -38,6 +38,9 @@
 		3000000000000000000000AD /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000AD /* ContentView.swift */; };
 		3000000000000000000000AE /* InvoiceDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000AE /* InvoiceDetailView.swift */; };
 		3000000000000000000000AF /* InvoiceListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000AF /* InvoiceListView.swift */; };
+		3000000000000000000000F5 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F5 /* Expense.swift */; };
+		3000000000000000000000F6 /* ExpenseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F6 /* ExpenseListView.swift */; };
+		3000000000000000000000F7 /* ExpenseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F7 /* ExpenseDetailView.swift */; };
 		3000000000000000000000B0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B0 /* SettingsView.swift */; };
 		3000000000000000000000B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B1 /* Assets.xcassets */; };
 		3000000000000000000000C0 /* RUKK.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C0 /* RUKK.icon */; };
@@ -84,6 +87,9 @@
 		2000000000000000000000AD /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		2000000000000000000000AE /* InvoiceDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceDetailView.swift; sourceTree = "<group>"; };
 		2000000000000000000000AF /* InvoiceListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceListView.swift; sourceTree = "<group>"; };
+		2000000000000000000000F5 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
+		2000000000000000000000F6 /* ExpenseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseListView.swift; sourceTree = "<group>"; };
+		2000000000000000000000F7 /* ExpenseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseDetailView.swift; sourceTree = "<group>"; };
 		2000000000000000000000B0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2000000000000000000000B1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2000000000000000000000B2 /* RUKK.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RUKK.entitlements; sourceTree = "<group>"; };
@@ -181,6 +187,7 @@
 				2000000000000000000000A5 /* InvoiceStatus.swift */,
 				2000000000000000000000A6 /* LineItem.swift */,
 				2000000000000000000000A7 /* Money.swift */,
+				2000000000000000000000F5 /* Expense.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -196,6 +203,8 @@
 				20000000000000000000A0FB /* Components.swift */,
 				20000000000000000000A0FC /* DragAndDrop.swift */,
 				2000000000000000000000AF /* InvoiceListView.swift */,
+				2000000000000000000000F6 /* ExpenseListView.swift */,
+				2000000000000000000000F7 /* ExpenseDetailView.swift */,
 				2000000000000000000000B0 /* SettingsView.swift */,
 				2000000000000000000000E5 /* CalendarImportView.swift */,
 				2000000000000000000000E7 /* TymeImportView.swift */,
@@ -351,6 +360,9 @@
 				30000000000000000000A0FB /* Components.swift in Sources */,
 				30000000000000000000A0FC /* DragAndDrop.swift in Sources */,
 				3000000000000000000000AF /* InvoiceListView.swift in Sources */,
+				3000000000000000000000F5 /* Expense.swift in Sources */,
+				3000000000000000000000F6 /* ExpenseListView.swift in Sources */,
+				3000000000000000000000F7 /* ExpenseDetailView.swift in Sources */,
 				3000000000000000000000B0 /* SettingsView.swift in Sources */,
 				3000000000000000000000E1 /* SubscriptionStore.swift in Sources */,
 				3000000000000000000000E2 /* PaywallView.swift in Sources */,

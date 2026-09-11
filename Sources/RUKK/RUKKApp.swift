@@ -22,12 +22,12 @@ struct RUKKApp: App {
             // Demó-ham keyrir á in-memory grunni svo sýnigögn snerti ekki raunveruleg gögn.
             let config = Demo.isActive ? ModelConfiguration(isStoredInMemoryOnly: true) : ModelConfiguration()
             container = try ModelContainer(
-                for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self,
+                for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self, Expense.self,
                 configurations: config
             )
             #else
             container = try ModelContainer(
-                for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self
+                for: Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self, Expense.self
             )
             #endif
         } catch {

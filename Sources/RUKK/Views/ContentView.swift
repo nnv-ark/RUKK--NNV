@@ -5,6 +5,7 @@ enum SidebarItem: Hashable {
     case dashboard
     case invoices
     case estimates
+    case expenses
     case contacts
 }
 
@@ -21,6 +22,8 @@ struct ContentView: View {
     /// Valið tilboð í Tilboða-flipanum — eigið val svo flipaskipti sýni aldrei
     /// reikning í tilboðsflipanum (og öfugt).
     @State private var selectedEstimate: Invoice?
+    /// Valin kostnaðarfærsla í Kostnaðar-flipanum.
+    @State private var selectedExpense: Expense?
     @State private var selectedContact: Contact?
     /// Viðskiptavinur sem var rétt í þessu stofnaður — fær innflutningsvalkost í dálki 2.
     @State private var newContactID: PersistentIdentifier?
@@ -70,6 +73,7 @@ struct ContentView: View {
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
             selectedEstimate = nil
+            selectedExpense = nil
             selectedContact = nil
             newContactID = nil
         }
@@ -143,6 +147,9 @@ struct ContentView: View {
             case .estimates:
                 InvoiceListView(company: company, selection: $selectedEstimate, estimatesOnly: true)
                     .id(company.id)
+            case .expenses:
+                ExpenseListView(company: company, selection: $selectedExpense)
+                    .id(company.id)
             case .contacts:
                 ContactsView(company: company,
                              selection: $selectedContact,
@@ -189,6 +196,13 @@ struct ContentView: View {
                     ContentUnavailableView("Enginn viðskiptavinur valinn", systemImage: "person.2",
                                            description: Text("Veldu eða búðu til viðskiptavin."))
                 }
+            case .expenses:
+                if let expense = selectedExpense {
+                    ExpenseDetailView(expense: expense)
+                } else {
+                    ContentUnavailableView("Enginn kostnaður valinn", systemImage: "creditcard",
+                                           description: Text("Veldu eða búðu til kostnaðarfærslu."))
+                }
             default:
                 if let document = openDocument {
                     InvoiceDetailView(invoice: document) { newInvoice in
@@ -217,6 +231,8 @@ struct ContentView: View {
                 .help("Reikningar")
             Image(systemName: "doc.append").tag(SidebarItem.estimates)
                 .help("Tilboð")
+            Image(systemName: "creditcard").tag(SidebarItem.expenses)
+                .help("Kostnaður")
             Image(systemName: "person.2").tag(SidebarItem.contacts)
                 .help("Viðskiptavinir")
         }
@@ -239,6 +255,9 @@ struct ContentView: View {
         }
         if let contacts = try? context.fetch(FetchDescriptor<Contact>(predicate: #Predicate { $0.owner == nil })) {
             for c in contacts { c.owner = company }
+        }
+        if let expenses = try? context.fetch(FetchDescriptor<Expense>(predicate: #Predicate { $0.company == nil })) {
+            for e in expenses { e.company = company }
         }
     }
 
@@ -384,5 +403,5 @@ struct ContentView: View {
 #Preview {
     ContentView()
         .environment(ImportInbox())
-        .modelContainer(for: [Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self], inMemory: true)
+        .modelContainer(for: [Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self, Expense.self], inMemory: true)
 }
