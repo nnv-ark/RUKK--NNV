@@ -1,6 +1,8 @@
 import XCTest
 import Foundation
 import Network
+import AppKit
+import CoreImage
 @testable import RUKK
 
 final class LinkAndMailTests: XCTestCase {
@@ -223,5 +225,58 @@ private final class MiniIMAPServer: @unchecked Sendable {
             conn.send(content: data[offset ..< end], completion: .idempotent)
             offset = end
         }
+    }
+}
+
+// MARK: - ReceiptImage
+
+extension LinkAndMailTests {
+
+    private func makeTestPDF() -> Data {
+        // macOS-hefðbundin PDF (UIGraphicsPDFRenderer er iOS-einstök): hvít síða
+        // með svörtum reit sem stendur fyrir „efni" á síðunni.
+        let data = NSMutableData()
+        var pageRect = CGRect(x: 0, y: 0, width: 300, height: 420)
+        let consumer = CGDataConsumer(data: data as CFMutableData)!
+        let ctx = CGContext(consumer: consumer, mediaBox: &pageRect, nil)!
+        ctx.beginPDFPage(nil)
+        ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1))
+        ctx.fill(CGRect(x: 20, y: 20, width: 100, height: 60))
+        ctx.endPDFPage()
+        ctx.closePDF()
+        return data as Data
+    }
+
+    /// PDF-rendring í fullri upplausn: löng hlið = longSide, ekki tóm mynd.
+    func testRenderPDFAtFullResolution() {
+        let pdf = makeTestPDF()
+        XCTAssertTrue(ReceiptImage.isPDF(pdf))
+        let image = ReceiptImage.render(pdf, longSide: 2000)
+        let cg = try! XCTUnwrap(image?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        XCTAssertEqual(max(cg.width, cg.height), 2000)
+        // Myndin má ekki vera eingöngu hvít — textinn á að hafa rendrast.
+        let data = cg.dataProvider!.data! as Data
+        let dark = data.filter { $0 < 100 }.count
+        XCTAssertGreaterThan(dark, 500, "PDF-rendringinn virðist tómur")
+    }
+
+    /// Stór mynd er smækkuð í 1800px JPEG; lítil mynd er óbreytt.
+    func testNormalizeDownscalesLargeImages() throws {
+        let cg = CGContext(data: nil, width: 4000, height: 3000, bitsPerComponent: 8,
+                           bytesPerRow: 0, space: CGColorSpaceCreateDeviceRGB(),
+                           bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue)!
+        cg.setFillColor(CGColor(red: 1, green: 1, blue: 1, alpha: 1))
+        cg.fill(CGRect(x: 0, y: 0, width: 4000, height: 3000))
+        let bigImage = NSImage(cgImage: cg.makeImage()!, size: NSSize(width: 4000, height: 3000))
+        let bigData = try XCTUnwrap(bigImage.tiffRepresentation)
+
+        let out = ReceiptImage.normalized(bigData)
+        XCTAssertEqual(out.prefix(3), Data([0xFF, 0xD8, 0xFF]), "úttakið á að vera JPEG")
+        let outCG = try XCTUnwrap(NSImage(data: out)?.cgImage(forProposedRect: nil, context: nil, hints: nil))
+        XCTAssertEqual(max(outCG.width, outCG.height), 1800)
+
+        // PDF fer óbreytt í gegn.
+        let pdf = makeTestPDF()
+        XCTAssertEqual(ReceiptImage.normalized(pdf), pdf)
     }
 }
