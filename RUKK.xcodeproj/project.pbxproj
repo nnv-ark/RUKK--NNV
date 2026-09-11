@@ -51,6 +51,7 @@
 		300000000000000000000107 /* MIMEMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000107 /* MIMEMessage.swift */; };
 		300000000000000000000108 /* IMAPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000108 /* IMAPClient.swift */; };
 		300000000000000000000109 /* ExpenseMailWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000109 /* ExpenseMailWatcher.swift */; };
+		300000000000000000000110 /* ReceiptImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000110 /* ReceiptImage.swift */; };
 		3000000000000000000000B0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B0 /* SettingsView.swift */; };
 		3000000000000000000000B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B1 /* Assets.xcassets */; };
 		3000000000000000000000C0 /* RUKK.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C0 /* RUKK.icon */; };
@@ -110,6 +111,7 @@
 		200000000000000000000107 /* MIMEMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIMEMessage.swift; sourceTree = "<group>"; };
 		200000000000000000000108 /* IMAPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMAPClient.swift; sourceTree = "<group>"; };
 		200000000000000000000109 /* ExpenseMailWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseMailWatcher.swift; sourceTree = "<group>"; };
+		200000000000000000000110 /* ReceiptImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptImage.swift; sourceTree = "<group>"; };
 		2000000000000000000000B0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2000000000000000000000B1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2000000000000000000000B2 /* RUKK.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RUKK.entitlements; sourceTree = "<group>"; };
@@ -207,6 +209,7 @@
 				200000000000000000000103 /* ReceiptReader.swift */,
 				200000000000000000000104 /* ExpenseIntake.swift */,
 				200000000000000000000105 /* RukkLinkService.swift */,
+				200000000000000000000110 /* ReceiptImage.swift */,
 			);
 			path = Link;
 			sourceTree = "<group>";
@@ -415,6 +418,7 @@
 				300000000000000000000103 /* ReceiptReader.swift in Sources */,
 				300000000000000000000104 /* ExpenseIntake.swift in Sources */,
 				300000000000000000000105 /* RukkLinkService.swift in Sources */,
+				300000000000000000000110 /* ReceiptImage.swift in Sources */,
 				300000000000000000000106 /* MailboxSettings.swift in Sources */,
 				300000000000000000000107 /* MIMEMessage.swift in Sources */,
 				300000000000000000000108 /* IMAPClient.swift in Sources */,

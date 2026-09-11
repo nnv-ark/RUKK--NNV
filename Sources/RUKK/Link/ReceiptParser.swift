@@ -56,14 +56,19 @@ enum ReceiptParser {
         return Decimal(string: s)
     }
 
-    /// Allar upphæðir sem koma fram í textalínu.
+    /// Allar upphæðir sem koma fram í textalínu. Kennitalur (123456-7890 eða
+    /// 10 tölur í röð) eru hunsunar — þær eru næstan alltaf stærsta talan á
+    /// kvittuninni og myndu annars verða fyrir „stærstu tölunnar" varafallinu.
     private static func amounts(in line: String) -> [Decimal] {
+        let withoutKt = line.replacingOccurrences(
+            of: #"\d{6}\s?-\s?\d{4}|\b\d{10}\b"#,
+            with: " ", options: .regularExpression)
         let pattern = #"\d{1,3}(?:[ .]\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?"#
         return (try? NSRegularExpression(pattern: pattern))
             .map { re in
-                re.matches(in: line, range: NSRange(line.startIndex..., in: line))
-                    .compactMap { Range($0.range, in: line) }
-                    .compactMap { parseAmount(String(line[$0])) }
+                re.matches(in: withoutKt, range: NSRange(withoutKt.startIndex..., in: withoutKt))
+                    .compactMap { Range($0.range, in: withoutKt) }
+                    .compactMap { parseAmount(String(withoutKt[$0])) }
             } ?? []
     }
 

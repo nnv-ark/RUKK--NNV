@@ -73,16 +73,21 @@ struct ExpenseDetailView: View {
 
     @ViewBuilder
     private var receiptWell: some View {
-        if let data = expense.receiptData, let image = NSImage(data: data) {
+        // ReceiptImage.render skilgreinir upplausn: PDF er rendrað í fullri
+        // gæði (NSImage(data:) gefur bara lágupplýsta fyrstu-síðu birtingu).
+        if let data = expense.receiptData, let image = ReceiptImage.render(data) {
             VStack(alignment: .leading, spacing: 8) {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: 320)
+                    .frame(maxHeight: 480)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                 HStack {
                     if expense.source == .billToBook {
                         CapsuleTag("Frá Bill To Book", color: .purple)
+                    }
+                    if ReceiptImage.isPDF(data) {
+                        CapsuleTag("PDF", color: .gray)
                     }
                     Spacer()
                     Button("Opna í Preview") { openReceipt(data) }
@@ -94,9 +99,9 @@ struct ExpenseDetailView: View {
                 Image(systemName: "doc.viewfinder")
                     .font(.largeTitle)
                     .foregroundStyle(.secondary)
-                Text("Droppaðu kvittunarmynd hér")
+                Text("Droppaðu kvittun hér (PDF, JPG eða PNG)")
                     .foregroundStyle(.secondary)
-                Button("Velja mynd…") { pickReceipt() }
+                Button("Velja skrá…") { pickReceipt() }
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 18)
@@ -104,27 +109,28 @@ struct ExpenseDetailView: View {
             .dropDestination(for: URL.self) { urls, _ in
                 guard let url = urls.first,
                       let data = try? Data(contentsOf: url),
-                      NSImage(data: data) != nil else { return false }
-                expense.receiptData = data
+                      ReceiptImage.isPDF(data) || NSImage(data: data) != nil else { return false }
+                expense.receiptData = ReceiptImage.normalized(data)
                 return true
             }
         }
     }
 
-    /// Skráarveljari fyrir kvittunarmynd.
+    /// Skráarveljari fyrir kvittun — PDF, JPEG og PNG.
     private func pickReceipt() {
         let panel = NSOpenPanel()
-        panel.allowedContentTypes = [.image]
+        panel.allowedContentTypes = [.image, .pdf]
         panel.allowsMultipleSelection = false
         guard panel.runModal() == .OK, let url = panel.url,
-              let data = try? Data(contentsOf: url), NSImage(data: data) != nil else { return }
-        expense.receiptData = data
+              let data = try? Data(contentsOf: url),
+              ReceiptImage.isPDF(data) || NSImage(data: data) != nil else { return }
+        expense.receiptData = ReceiptImage.normalized(data)
     }
 
-    /// Opnar kvittunarmyndina í Preview (tímabundin skrá í /tmp).
+    /// Opnar kvittunarmyndina í Preview með réttri skráarendingu (pdf/jpg/png).
     private func openReceipt(_ data: Data) {
         let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("rukk-kvittun-\(expense.createdAt.timeIntervalSince1970).png")
+            .appendingPathComponent("rukk-kvittun-\(expense.createdAt.timeIntervalSince1970).\(ReceiptImage.fileExtension(for: data))")
         do {
             try data.write(to: url)
             NSWorkspace.shared.open(url)

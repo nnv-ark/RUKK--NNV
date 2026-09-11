@@ -68,6 +68,18 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(ReceiptParser.parse(lines: lines).total, 3_490)
     }
 
+    /// Kennitala (6-4 eða 10 tölur í röð) má aldrei verða upphæð — hún er
+    /// næstan alltaf stærsta talan á kvittuninni og drap varafallið áður.
+    func testKennitalaIsNotAnAmount() {
+        let lines = ["BÓNUS", "Laugavegi 59, 101 Reykjavík", "Kt. 640198-2029",
+                     "Mjólk 289", "Samtals: 1.737 kr."]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.total, 1_737)
+        // Og þegar samtals-línan lesist ekki (lélegt OCR) má kt. ekki vinna.
+        let noTotal = ["BÓNUS", "Kt. 640198-2029", "Mjólk 289"]
+        XCTAssertEqual(ReceiptParser.parse(lines: noTotal).total, 289)
+    }
+
     func testISODate() {
         let parsed = ReceiptParser.parse(lines: ["VERSLANA MÍN", "2026-09-11", "SAMTALS 1.000"])
         let comps = Calendar.current.dateComponents([.year, .month, .day], from: try! XCTUnwrap(parsed.date))

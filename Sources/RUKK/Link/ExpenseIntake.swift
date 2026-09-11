@@ -23,7 +23,11 @@ enum ExpenseIntake {
         fallbackCompany: AppSettings
     ) -> Expense {
         let company = matchCompany(named: companyName, in: context) ?? fallbackCompany
-        let expense = Expense.makeFromBillToBook(in: context, company: company, receipt: receipt)
+        // Námunda fyrir geymslu: stórar myndir fara í 1800px JPEG, PDF helst
+        // óbreytt (Bill To Book þjappar þegar sjálft).
+        let storedReceipt = ReceiptImage.normalized(receipt)
+        let expense = Expense.makeFromBillToBook(in: context, company: company,
+                                                 receipt: storedReceipt)
         expense.source = source
         if let date { expense.date = date }
         if let receiptNumber {
@@ -38,7 +42,7 @@ enum ExpenseIntake {
         // Líkanið sjálft er greipt — ekki persistentModelID, sem er TÍMABUNDIÐ
         // uns context er vistað (save() gerist í fetchUnseen) og úrelta
         // auðkennið olli SwiftData assertion-hruni.
-        let receiptCopy = receipt
+        let receiptCopy = storedReceipt
         Task { @MainActor [expense] in
             let lines = await Task.detached(priority: .utility) {
                 await ReceiptReader.textLines(from: receiptCopy)
