@@ -2,6 +2,10 @@
 import Foundation
 import SwiftData
 import AppKit
+import os
+
+/// Eigin logger — appLog býr í RUKKApp.swift sem er utan SwiftPM-marksins.
+private let demoLog = Logger(subsystem: "is.calmail.kula", category: "demo")
 
 /// Demó-stuðningur — EINGÖNGU í DEBUG og aðeins virkur með ræsibreytum.
 /// Notað til að taka skjámyndir (App Store). Fer aldrei í útgáfu (Release sleppir #if DEBUG).
@@ -37,16 +41,18 @@ enum Demo {
         a.logoData = logo
         context.insert(a)
 
+        // Öll fyrirtæki hér eru tilbúningur. Sýnigögnin rata í skjámyndir á App Store,
+        // svo hér mega hvorki raunveruleg fyrirtæki né raunverulegar kennitölur koma við sögu.
         func customer(_ name: String, _ company: String, _ kt: String, _ email: String, _ addr: String) -> Contact {
             let c = Contact(name: name, company: company, nationalID: kt, email: email, phone: "", address: addr)
             c.owner = a
             context.insert(c)
             return c
         }
-        let blaa = customer("Anna Björk", "Bláa Lónið hf.", "5006830489", "reikningar@bluelagoon.is", "Norðurljósavegur 9\n240 Grindavík")
-        let air = customer("Gunnar Þór", "Icelandair ehf.", "4612951079", "ap@icelandair.is", "Reykjavíkurflugvöllur\n101 Reykjavík")
-        let marel = customer("Sigrún Halls", "Marel hf.", "6710040570", "invoice@marel.is", "Austurhraun 9\n210 Garðabær")
-        let nordur = customer("Davíð Örn", "66°Norður", "5304692359", "bokhald@66north.is", "Bankastræti 5\n101 Reykjavík")
+        let blaa = customer("Anna Björk", "Sjávarbakki ehf.", "4906091230", "reikningar@sjavarbakki.is", "Hafnargata 12\n240 Grindavík")
+        let air = customer("Gunnar Þór", "Vindás Flutningar ehf.", "5102101450", "bokhald@vindas.is", "Fiskislóð 31\n101 Reykjavík")
+        let marel = customer("Sigrún Halls", "Straumur Tækni ehf.", "6503121890", "reikningar@straumurtaekni.is", "Austurhraun 9\n210 Garðabær")
+        let nordur = customer("Davíð Örn", "Ullarsel ehf.", "4408141670", "bokhald@ullarsel.is", "Bankastræti 5\n101 Reykjavík")
 
         func invoice(_ recipient: Contact, _ n: Int, _ issue: Date, due: Int,
                      status: InvoiceStatus, paidAfter: Int? = nil, discount: Decimal = 0,
@@ -89,7 +95,38 @@ enum Demo {
                 items: [("Skjákynning", 1, 145000)])               // gjaldfallið
         invoice(nordur, 8, day(2026, 5, 20),  due: 30, status: .sent,
                 items: [("Vörusíða", 1, 410000), ("SEO-úttekt", 1, 95000)])
-        a.nextInvoiceNumber = 9
+        // Langur reikningur — sýnir tímaskýrsluna sem tekur við þegar sundurliðunin
+        // kemst ekki á reikninginn sjálfan.
+        let longWork: [(String, Decimal, Decimal)] = [
+            ("Verkfundur og þarfagreining", 6, 19000),
+            ("Skissur — fyrsta yfirferð", 8, 19000),
+            ("Skissur — önnur yfirferð", 5.5, 19000),
+            ("Grunnmyndir 1. hæð", 12, 19000),
+            ("Grunnmyndir 2. hæð", 9, 19000),
+            ("Sniðteikningar", 7.5, 19000),
+            ("Útlitsteikningar norður og austur", 6, 19000),
+            ("Útlitsteikningar suður og vestur", 6, 19000),
+            ("Deiliteikningar glugga", 4.5, 19000),
+            ("Deiliteikningar stiga", 5, 19000),
+            ("Efnisval og áferðir", 3.5, 19000),
+            ("Samráð við burðarþolshönnuð", 4, 19000),
+            ("Samráð við lagnahönnuð", 3, 19000),
+            ("Yfirferð með verkkaupa", 2.5, 19000),
+            ("Leiðréttingar eftir yfirferð", 6, 19000),
+            ("Byggingarnefndarteikningar", 10, 19000),
+            ("Umsókn og fylgigögn", 3, 19000),
+            ("Svör við athugasemdum", 4, 19000),
+            ("Magntaka", 5.5, 19000),
+            ("Útboðsgögn", 8, 19000),
+            ("Yfirferð tilboða", 3, 19000),
+            ("Eftirlit á verkstað — september", 6, 19000),
+            ("Eftirlit á verkstað — október", 6, 19000),
+            ("Lokaúttekt", 4, 19000),
+            ("Skilagögn og teikningasafn", 5, 19000),
+        ]
+        invoice(marel,  9, day(2026, 5, 28),  due: 30, status: .sent,
+                note: "Sundurliðun fylgir í tímaskýrslu.", items: longWork)
+        a.nextInvoiceNumber = 10
 
         // Sýni-tilboð (opin fyrir „Breyta í reikning“).
         let est = Invoice(number: "", currencyCode: "ISK", taxRate: 24)
@@ -156,4 +193,83 @@ enum Demo {
         return rep.representation(using: .png, properties: [:])
     }
 }
+
+// MARK: - Skjámyndir fyrir App Store
+
+/// Tekur mynd af eigin glugga — engin skjáupptökuheimild kemur við sögu, því
+/// glugginn teiknar sig sjálfur í bitmap. EINGÖNGU í DEBUG.
+@MainActor
+enum Screenshotter {
+
+    /// Mappan sem myndirnar lenda í. RUKK er í sandkassa, svo skrifað er í eigin
+    /// gámamöppu — þaðan má afrita þær hvert sem er.
+    static var folder: URL {
+        let documents = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        return documents.appending(path: "AppStoreShots", directoryHint: .isDirectory)
+    }
+
+    /// Stillir gluggann á 1280×800 punkta — 2560×1600 dílar á Retina, sem er
+    /// nákvæmlega það sem App Store vill fyrir macOS.
+    static func resizeForAppStore() {
+        guard let window = mainWindow else { return }
+        // Á 1x-skjá yrði myndin 1280×800 díla; Retina-skjárinn skilar 2560×1600,
+        // sem er stærðin sem App Store vill. Því er glugginn fluttur þangað fyrst.
+        let retina = NSScreen.screens.max { $0.backingScaleFactor < $1.backingScaleFactor }
+        var frame = window.frame
+        let target = NSSize(width: 1280, height: 800)
+        let chrome = frame.height - (window.contentView?.frame.height ?? frame.height)
+        frame.size = NSSize(width: target.width, height: target.height + chrome)
+        if let screen = retina {
+            let visible = screen.visibleFrame
+            frame.origin = NSPoint(x: visible.midX - frame.width / 2,
+                                   y: visible.midY - frame.height / 2)
+        }
+        window.setFrame(frame, display: true)
+    }
+
+    /// Skrifar PNG af glugganum eins og hann er núna.
+    @discardableResult
+    static func capture(named name: String) -> URL? {
+        guard let window = mainWindow else { NSSound.beep(); return nil }
+
+        // cacheDisplay nær ekki SwiftUI-efninu (það býr í eigin lögum), svo glugginn
+        // er myndaður eins og gluggi — eigin gluggi krefst engrar skjáupptökuheimildar.
+        guard let cg = CGWindowListCreateImage(
+                .null,
+                .optionIncludingWindow,
+                CGWindowID(window.windowNumber),
+                [.boundsIgnoreFraming, .bestResolution]) else {
+            demoLog.error("Screenshot: window image unavailable")
+            NSSound.beep(); return nil
+        }
+        let rep = NSBitmapImageRep(cgImage: cg)
+        guard let data = rep.representation(using: .png, properties: [:]) else {
+            NSSound.beep(); return nil
+        }
+        do {
+            try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+            let url = folder.appending(path: "\(name).png")
+            try data.write(to: url)
+            demoLog.info("Screenshot written: \(url.path, privacy: .public)")
+            return url
+        } catch {
+            demoLog.error("Screenshot failed: \(String(describing: error), privacy: .public)")
+            NSSound.beep()
+            return nil
+        }
+    }
+
+    /// Nafnlaus skot fá hlaupandi númer.
+    private static var counter = 0
+    static func captureNext() {
+        counter += 1
+        capture(named: String(format: "shot-%02d", counter))
+    }
+
+    private static var mainWindow: NSWindow? {
+        NSApp.windows.first { $0.isVisible && $0.contentView != nil && $0.styleMask.contains(.titled) }
+    }
+}
+
+
 #endif

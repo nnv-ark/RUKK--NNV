@@ -159,6 +159,15 @@ struct RUKKCommands: Commands {
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(exportXML == nil)
         }
+        #if DEBUG
+        // Skjámyndataka fyrir App Store — aðeins í DEBUG, aldrei í útgáfu.
+        CommandMenu("Skjámyndir") {
+            Button("Stilla glugga (1280×800)") { Screenshotter.resizeForAppStore() }
+                .keyboardShortcut("r", modifiers: [.command, .option, .control])
+            Button("Taka skjámynd") { Screenshotter.captureNext() }
+                .keyboardShortcut("s", modifiers: [.command, .option, .control])
+        }
+        #endif
         CommandGroup(replacing: .printItem) {
             Button("Prenta…") { printInvoice?() }
                 .keyboardShortcut("p", modifiers: .command)
