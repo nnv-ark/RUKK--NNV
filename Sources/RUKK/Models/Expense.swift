@@ -40,10 +40,18 @@ final class Expense {
         self.createdAt = .now
     }
 
-    /// VSK innifaldur í upphæðinni: gross × hlutfall ÷ (100 + hlutfall).
+    /// VSK innifaldur í upphæðinni, reiknaður eins og á íslenskum kvittunum:
+    /// nettó = upphæð ÷ (1 + hlutfall) námundað í minnsta einingu gjaldmiðils,
+    /// VSK = upphæð − nettó. Þannig stemmir talan við „Þar af VSK" á kvittuninni
+    /// (t.d. 5.000 kr. @ 11 % → nettó 4.505, VSK 495 — ekki 496 eins og beinn
+    /// útreikningur 5.000 × 11/111 = 495,495… gæfi eftir tvöfalda námundun).
     var vatAmount: Decimal {
         guard taxRate > 0 else { return 0 }
-        return (amount * taxRate / (100 + taxRate)).roundedMoney
+        let scale = currencyCode == "ISK" ? 0 : 2
+        var input = amount / (1 + taxRate / 100)
+        var net = Decimal()
+        NSDecimalRound(&net, &input, scale, .plain)
+        return amount - net
     }
 
     /// Upphæð án VSK.

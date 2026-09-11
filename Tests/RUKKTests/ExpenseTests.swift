@@ -37,6 +37,41 @@ final class ExpenseTests: XCTestCase {
         XCTAssertEqual(expense.netAmount, 10_000)
     }
 
+    /// N1-kvittun: 5.000 kr. með 11 % VSK — kvittunin segir nettó 4.505, VSK 495.
+    /// Beinn útreikningur 5000 × 11/111 = 495,495… má EKKI námundast í 496.
+    func testVatMatchesReceiptRoundingN1() throws {
+        let expense = Expense(amount: 5_000)
+        expense.taxRate = 11
+        XCTAssertEqual(expense.vatAmount, 495)
+        XCTAssertEqual(expense.netAmount, 4_505)
+    }
+
+    /// 12.500 kr. @ 24 % → nettó 10.081, VSK 2.419 (sama og áður).
+    func testVatMatchesReceiptRounding24() throws {
+        let expense = Expense(amount: 12_500)
+        expense.taxRate = 24
+        XCTAssertEqual(expense.vatAmount, 2_419)
+        XCTAssertEqual(expense.netAmount, 10_081)
+    }
+
+    /// 1.737 kr. @ 24 % → nettó 1.401, VSK 336.
+    func testVatMatchesReceiptRoundingOddAmount() throws {
+        let expense = Expense(amount: 1_737)
+        expense.taxRate = 24
+        XCTAssertEqual(expense.vatAmount, 336)
+        XCTAssertEqual(expense.netAmount, 1_401)
+    }
+
+    /// Erindi í öðrum gjaldmiðli námundast í sent, ekki heilar krónur.
+    func testVatForeignCurrencyRoundsToCents() throws {
+        let expense = Expense(amount: Decimal(string: "100.00")!)
+        expense.taxRate = 24
+        expense.currencyCode = "EUR"
+        // nettó = 100 / 1,24 = 80,645… → 80,65 → VSK 19,35
+        XCTAssertEqual(expense.vatAmount, Decimal(string: "19.35"))
+        XCTAssertEqual(expense.netAmount, Decimal(string: "80.65"))
+    }
+
     func testMakeNextUsesCompanyDefaults() throws {
         let context = try makeContext()
         let company = AppSettings()
