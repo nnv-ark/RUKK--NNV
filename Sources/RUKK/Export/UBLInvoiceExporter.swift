@@ -49,10 +49,11 @@ enum UBLInvoiceExporter {
         supplierParty(&b, company)
         customerParty(&b, invoice.recipient)
         paymentMeans(&b, company, invoice)
-        documentAllowances(&b, invoice)
-        taxTotal(&b, invoice)
-        monetaryTotal(&b, invoice)
-        invoiceLines(&b, invoice)
+        let totals = EInvoiceTotals(invoice: invoice)
+        documentAllowances(&b, invoice, totals)
+        taxTotal(&b, invoice, totals)
+        monetaryTotal(&b, invoice, totals)
+        invoiceLines(&b, invoice, totals)
 
         b.close("Invoice")
         return b.text
@@ -151,19 +152,20 @@ enum UBLInvoiceExporter {
         b.close("cac:PaymentMeans")
     }
 
-    private static func documentAllowances(_ b: inout XMLBuilder, _ invoice: Invoice) {
+    private static func documentAllowances(_ b: inout XMLBuilder, _ invoice: Invoice,
+                                           _ totals: EInvoiceTotals) {
         guard invoice.discountAmount != 0 else { return }
         let cur = invoice.currencyCode
-        let pct = invoice.discountAmount
         // Eitt document-level AllowanceCharge per VSK-flokk svo skattstofn hvers flokks
         // lækki rétt og heildartölur rími (BR-S-08, BR-CO-13/15 í PEPPOL EN16931).
-        for group in invoice.lineNetByRate {
+        // Upphæðirnar eru þær námunduðu — AllowanceTotalAmount er summa þeirra.
+        for group in totals.subtotals where group.allowance != 0 {
             b.open("cac:AllowanceCharge")
             b.el("cbc:ChargeIndicator", "false")
             b.el("cbc:AllowanceChargeReason", "Afsláttur")
-            b.el("cbc:MultiplierFactorNumeric", percent(pct))
-            b.el("cbc:Amount", money(group.net * pct / 100), attrs: ["currencyID": cur])
-            b.el("cbc:BaseAmount", money(group.net), attrs: ["currencyID": cur])
+            b.el("cbc:MultiplierFactorNumeric", percent(invoice.discountAmount))
+            b.el("cbc:Amount", money(group.allowance), attrs: ["currencyID": cur])
+            b.el("cbc:BaseAmount", money(group.lineNet), attrs: ["currencyID": cur])
             taxCategory(&b, rate: group.rate)
             b.close("cac:AllowanceCharge")
         }
@@ -171,11 +173,12 @@ enum UBLInvoiceExporter {
 
     // MARK: - Tax
 
-    private static func taxTotal(_ b: inout XMLBuilder, _ invoice: Invoice) {
+    private static func taxTotal(_ b: inout XMLBuilder, _ invoice: Invoice,
+                                 _ totals: EInvoiceTotals) {
         let cur = invoice.currencyCode
         b.open("cac:TaxTotal")
-        b.el("cbc:TaxAmount", money(invoice.taxValue), attrs: ["currencyID": cur])
-        for group in invoice.vatBreakdown {
+        b.el("cbc:TaxAmount", money(totals.taxTotal), attrs: ["currencyID": cur])
+        for group in totals.subtotals {
             b.open("cac:TaxSubtotal")
             b.el("cbc:TaxableAmount", money(group.base), attrs: ["currencyID": cur])
             b.el("cbc:TaxAmount", money(group.tax), attrs: ["currencyID": cur])
@@ -195,27 +198,30 @@ enum UBLInvoiceExporter {
 
     // MARK: - Totals
 
-    private static func monetaryTotal(_ b: inout XMLBuilder, _ invoice: Invoice) {
+    private static func monetaryTotal(_ b: inout XMLBuilder, _ invoice: Invoice,
+                                      _ totals: EInvoiceTotals) {
         let cur = invoice.currencyCode
         b.open("cac:LegalMonetaryTotal")
-        b.el("cbc:LineExtensionAmount", money(invoice.subtotal), attrs: ["currencyID": cur])
-        b.el("cbc:TaxExclusiveAmount", money(invoice.taxableBase), attrs: ["currencyID": cur])
-        b.el("cbc:TaxInclusiveAmount", money(invoice.total), attrs: ["currencyID": cur])
-        if invoice.discountValue != 0 {
-            b.el("cbc:AllowanceTotalAmount", money(invoice.discountValue), attrs: ["currencyID": cur])
+        b.el("cbc:LineExtensionAmount", money(totals.lineExtension), attrs: ["currencyID": cur])
+        b.el("cbc:TaxExclusiveAmount", money(totals.taxExclusive), attrs: ["currencyID": cur])
+        b.el("cbc:TaxInclusiveAmount", money(totals.taxInclusive), attrs: ["currencyID": cur])
+        if totals.allowanceTotal != 0 {
+            b.el("cbc:AllowanceTotalAmount", money(totals.allowanceTotal), attrs: ["currencyID": cur])
         }
-        b.el("cbc:PayableAmount", money(invoice.total), attrs: ["currencyID": cur])
+        b.el("cbc:PayableAmount", money(totals.taxInclusive), attrs: ["currencyID": cur])
         b.close("cac:LegalMonetaryTotal")
     }
 
-    private static func invoiceLines(_ b: inout XMLBuilder, _ invoice: Invoice) {
+    private static func invoiceLines(_ b: inout XMLBuilder, _ invoice: Invoice,
+                                     _ totals: EInvoiceTotals) {
         let cur = invoice.currencyCode
         // Fyrirsagnir eru útlit, ekki gjaldlínur — þær fara ekki í rafrænan reikning.
-        for (idx, item) in invoice.orderedItems.filter({ !$0.isHeading }).enumerated() {
+        for (idx, item) in invoice.billableItems.enumerated() {
             b.open("cac:InvoiceLine")
             b.el("cbc:ID", "\(idx + 1)")
             b.el("cbc:InvoicedQuantity", quantity(item.quantity), attrs: ["unitCode": "C62"])
-            b.el("cbc:LineExtensionAmount", money(item.subtotal), attrs: ["currencyID": cur])
+            // Námundaða upphæðin — summa þessara lína er LineExtensionAmount (BR-CO-10).
+            b.el("cbc:LineExtensionAmount", money(totals.lines[idx].net), attrs: ["currencyID": cur])
             b.open("cac:Item")
             b.el("cbc:Name", item.itemDescription.isEmpty ? "Vara" : item.itemDescription)
             b.open("cac:ClassifiedTaxCategory")

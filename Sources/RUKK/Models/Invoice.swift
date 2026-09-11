@@ -251,7 +251,7 @@ final class Invoice {
     }
 
     /// Línur sem bera upphæð — fyrirsagnir eru aðeins texti og telja hvergi með.
-    var billableItems: [LineItem] { lineItems.filter { !$0.isHeading } }
+    var billableItems: [LineItem] { orderedItems.filter { !$0.isHeading } }
 
     var subtotal: Decimal {                                  // samtals án VSK
         billableItems.reduce(0) { $0 + $1.subtotal }
@@ -292,5 +292,76 @@ final class Invoice {
             let base = net * discountFactor
             return (rate, base, base * rate / 100)
         }
+    }
+}
+
+// MARK: - Námundun fyrir rafrænan reikning
+
+extension Decimal {
+    /// Námundar í tvo aukastafi, hálft upp á við (0,005 → 0,01; −0,005 → −0,01).
+    /// Þetta er námundunin sem EN16931 gerir ráð fyrir í upphæðum.
+    var roundedMoney: Decimal {
+        var input = self
+        var out = Decimal()
+        NSDecimalRound(&out, &input, 2, .plain)
+        return out
+    }
+}
+
+/// Upphæðir reiknings eins og þær fara í rafrænan reikning: hver upphæð námunduð
+/// EINU SINNI, og allar samtölur reiknaðar út frá námunduðu hlutunum. Þannig stemmir
+/// summa línanna alltaf við skjalstölurnar (BR-CO-10, BR-CO-13/15, BR-S-08).
+struct EInvoiceTotals: Sendable {
+    struct Line: Sendable {
+        let rate: Decimal
+        /// Nettóupphæð línunnar, námunduð.
+        let net: Decimal
+    }
+    struct TaxSubtotal: Sendable {
+        let rate: Decimal
+        /// Nettósamtala línanna í flokknum fyrir afslátt, námunduð.
+        let lineNet: Decimal
+        /// Afsláttur flokksins, námundaður.
+        let allowance: Decimal
+        /// Skattstofn eftir afslátt = lineNet − allowance.
+        let base: Decimal
+        /// VSK flokksins, námundaður af skattstofni.
+        let tax: Decimal
+    }
+
+    let lines: [Line]
+    let subtotals: [TaxSubtotal]
+    /// Σ námundaðra línuupphæða.
+    let lineExtension: Decimal
+    /// Σ námundaðra afslátta.
+    let allowanceTotal: Decimal
+    /// lineExtension − allowanceTotal.
+    let taxExclusive: Decimal
+    /// Σ námundaðra VSK-upphæða.
+    let taxTotal: Decimal
+    /// taxExclusive + taxTotal.
+    let taxInclusive: Decimal
+
+    @MainActor
+    init(invoice: Invoice) {
+        let items = invoice.billableItems
+        lines = items.map { Line(rate: $0.taxRate, net: $0.subtotal.roundedMoney) }
+        lineExtension = lines.reduce(Decimal(0)) { $0 + $1.net }
+
+        let factor = invoice.discountAmount / 100
+        subtotals = Dictionary(grouping: lines, by: { $0.rate })
+            .map { rate, group -> TaxSubtotal in
+                let net = group.reduce(Decimal(0)) { $0 + $1.net }
+                let allowance = (net * factor).roundedMoney
+                let base = net - allowance
+                return TaxSubtotal(rate: rate, lineNet: net, allowance: allowance,
+                                   base: base, tax: (base * rate / 100).roundedMoney)
+            }
+            .sorted { $0.rate < $1.rate }
+
+        allowanceTotal = subtotals.reduce(Decimal(0)) { $0 + $1.allowance }
+        taxExclusive = lineExtension - allowanceTotal
+        taxTotal = subtotals.reduce(Decimal(0)) { $0 + $1.tax }
+        taxInclusive = taxExclusive + taxTotal
     }
 }
