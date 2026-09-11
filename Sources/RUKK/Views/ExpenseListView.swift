@@ -171,6 +171,12 @@ private struct ExpenseRow: View {
                 Text(Money.format(expense.amount, currencyCode: expense.currencyCode))
                     .monospacedDigit()
                 HStack(spacing: 4) {
+                    if expense.reviewed {
+                        Image(systemName: "checkmark.seal.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.green)
+                            .help("Búið að yfirfara")
+                    }
                     if expense.receiptData != nil {
                         Image(systemName: "paperclip")
                             .font(.caption2)

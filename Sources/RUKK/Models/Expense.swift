@@ -20,6 +20,8 @@ final class Expense {
     var taxRate: Decimal = 24               // VSK-hlutfall (0 / 11 / 24)
     var currencyCode: String = "ISK"
     var note: String = ""
+    /// Hakað við þegar færslan hefur verið yfirfarin (t.d. stemmd við kvittun).
+    var reviewed: Bool = false
     /// Mynd kvittunar (PNG/JPEG-gögn). Fyllt af Bill To Book eða við drop.
     var receiptData: Data?
     var sourceRaw: String = ExpenseSource.manual.rawValue

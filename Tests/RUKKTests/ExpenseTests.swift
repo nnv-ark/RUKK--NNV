@@ -72,6 +72,14 @@ final class ExpenseTests: XCTestCase {
         XCTAssertEqual(expense.netAmount, Decimal(string: "80.65"))
     }
 
+    /// Ný færsla er óyfirfarin sjálfgefið; hakk er fylgt með færslunni.
+    func testReviewedDefaultsToFalse() throws {
+        let expense = Expense(amount: 5_000)
+        XCTAssertFalse(expense.reviewed)
+        expense.reviewed = true
+        XCTAssertTrue(expense.reviewed)
+    }
+
     func testMakeNextUsesCompanyDefaults() throws {
         let context = try makeContext()
         let company = AppSettings()

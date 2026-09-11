@@ -57,6 +57,10 @@ struct ExpenseDetailView: View {
                 TextField("Mynt", text: $expense.currencyCode)
             }
 
+            Section {
+                Toggle("Búið að yfirfara", isOn: $expense.reviewed)
+            }
+
             Section("Athugasemd") {
                 TextField("Athugasemd", text: $expense.note, axis: .vertical)
             }
