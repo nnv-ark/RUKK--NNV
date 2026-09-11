@@ -33,6 +33,9 @@ the standard Icelandic format, and invoices can be exported as **PDF** or as a
   notes, and import from the macOS **Contacts** app.
 - **Export** — PDF, electronic invoice (UBL/TS-136 XML), or batch-export *all* invoices
   (PDF + XML) to a folder at once.
+- **VSK return** — *Flytja út VSK-yfirlit (VSKIL)* builds a VAT-summary JSON
+  for a chosen two-month period (issued invoices by booking date, expenses) that
+  [VSKIL](https://github.com/nnv-ark/VSKIL) reads to prefill the Icelandic VAT return.
 - **Drag and drop** — drag a verkþáttur out of [BLIZZ](https://github.com/nnv-ark/BLIZZ) and
   drop it on RUKK: only unbilled time comes across, each task arrives under its own heading,
   and you get a draft invoice (or the lines are added to the invoice already open). Drag an
@@ -79,7 +82,8 @@ Sources/RUKK/
   Views/                 ContentView, Dashboard, invoice list/detail, customers, settings, drag & drop
   Templates/             IcelandicTemplate (SwiftUI → PDF), QR code
   PDF/                   PDF rendering, printing, Page Setup, Preview, email
-  Export/                UBL/TS-136 XML exporter (invoices and credit notes), batch exporter
+  Export/                UBL/TS-136 XML exporter (invoices and credit notes), batch exporter,
+                         VSK-summary exporter for VSKIL
   Subscription/          StoreKit paywall and subscription store
   BlizzImporter / TymeImporter / CalendarImporter / CustomerImport / InvoiceImport / XLSXReader
                          Time-entry and customer importers

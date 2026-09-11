@@ -7,6 +7,10 @@ let appLog = Logger(subsystem: "is.calmail.kula", category: "app")
 @main
 struct RUKKApp: App {
     let container: ModelContainer
+    /// Bein tenging við Bill To Book í símanum (Bonjour/MultipeerConnectivity).
+    let linkService: RukkLinkService
+    /// Póstvakt — sækir kvittanir af vöktuðu póstfangi (valkostur við beina tengingu).
+    let mailWatcher: ExpenseMailWatcher
     /// Tungumál viðmótsins — óháð tungumáli reikninga (sjá Stillingar → Tungumál).
     @AppStorage("uiLanguage") private var uiLanguage: String = AppLanguage.icelandic.rawValue
 
@@ -36,11 +40,19 @@ struct RUKKApp: App {
             appLog.fault("Failed to create ModelContainer: \(error, privacy: .public)")
             fatalError("Failed to create ModelContainer: \(error)")
         }
+        let localContainer = container   // staðbundið — self er enn í upphafssetningu
         #if DEBUG
         if Demo.isActive {
-            MainActor.assumeIsolated { Demo.seedIfNeeded(container.mainContext) }
+            MainActor.assumeIsolated { Demo.seedIfNeeded(localContainer.mainContext) }
         }
         #endif
+        // Þjónustur sem þurfa gagnagrunninn: bein símatenging og póstvakt.
+        // Þær ræsa ekki sjálfar — ContentView kallar start() þegar viðmótið er tilbúið.
+        linkService = RukkLinkService(container: localContainer) {
+            AppSettings.active(in: localContainer.mainContext,
+                               activeID: UserDefaults.standard.string(forKey: "activeCompanyID") ?? "")
+        }
+        mailWatcher = ExpenseMailWatcher()
     }
 
     var body: some Scene {
@@ -51,6 +63,8 @@ struct RUKKApp: App {
                 .appAppearance()
         }
         .modelContainer(container)
+        .environment(linkService)
+        .environment(mailWatcher)
         .defaultSize(width: 1200, height: 760)
         // Full hæð á tækjastikunni (eins og í BLIZZ) — ekki samanfallin titilrönd.
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -63,6 +77,7 @@ struct RUKKApp: App {
         Settings {
             SettingsView()
                 .modelContainer(container)
+                .environment(mailWatcher)
                 .appAppearance()
         }
         .defaultSize(width: 640, height: 760)
@@ -136,6 +151,7 @@ struct RUKKCommands: Commands {
     @FocusedValue(\.printInvoice) private var printInvoice
     @FocusedValue(\.exportPDF) private var exportPDF
     @FocusedValue(\.exportXML) private var exportXML
+    @FocusedValue(\.exportVSKSummary) private var exportVSKSummary
     @FocusedValue(\.importCustomers) private var importCustomers
 
     var body: some Commands {
@@ -158,6 +174,8 @@ struct RUKKCommands: Commands {
             Button("Flytja út rafrænan reikning (UBL / TS-136)…") { exportXML?() }
                 .keyboardShortcut("e", modifiers: [.command, .shift])
                 .disabled(exportXML == nil)
+            Button("Flytja út VSK-yfirlit (VSKIL)…") { exportVSKSummary?() }
+                .disabled(exportVSKSummary == nil)
         }
         #if DEBUG
         // Skjámyndataka fyrir App Store — aðeins í DEBUG, aldrei í útgáfu.

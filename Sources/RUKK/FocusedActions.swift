@@ -8,6 +8,7 @@ struct NewEstimateAction: FocusedValueKey { typealias Value = () -> Void }
 struct PrintInvoiceAction: FocusedValueKey { typealias Value = () -> Void }
 struct ExportPDFAction: FocusedValueKey { typealias Value = () -> Void }
 struct ExportXMLAction: FocusedValueKey { typealias Value = () -> Void }
+struct ExportVSKSummaryAction: FocusedValueKey { typealias Value = () -> Void }
 struct ImportCustomersAction: FocusedValueKey { typealias Value = () -> Void }
 
 extension FocusedValues {
@@ -28,5 +29,8 @@ extension FocusedValues {
     }
     var exportXML: (() -> Void)? {
         get { self[ExportXMLAction.self] } set { self[ExportXMLAction.self] = newValue }
+    }
+    var exportVSKSummary: (() -> Void)? {
+        get { self[ExportVSKSummaryAction.self] } set { self[ExportVSKSummaryAction.self] = newValue }
     }
 }

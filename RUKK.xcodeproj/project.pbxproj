@@ -29,6 +29,7 @@
 		3000000000000000000000A8 /* PDFRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000A8 /* PDFRenderer.swift */; };
 		3000000000000000000000B6 /* UBLInvoiceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B6 /* UBLInvoiceExporter.swift */; };
 		3000000000000000000000BC /* BatchExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000BC /* BatchExporter.swift */; };
+		3000000000000000000000C2 /* VskSummaryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C2 /* VskSummaryExporter.swift */; };
 		3000000000000000000000E1 /* SubscriptionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000E1 /* SubscriptionStore.swift */; };
 		3000000000000000000000E2 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000E2 /* PaywallView.swift */; };
 		3000000000000000000000BA /* CustomerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000BA /* CustomerDetailView.swift */; };
@@ -41,6 +42,15 @@
 		3000000000000000000000F5 /* Expense.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F5 /* Expense.swift */; };
 		3000000000000000000000F6 /* ExpenseListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F6 /* ExpenseListView.swift */; };
 		3000000000000000000000F7 /* ExpenseDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F7 /* ExpenseDetailView.swift */; };
+		300000000000000000000101 /* RukkEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000101 /* RukkEnvelope.swift */; };
+		300000000000000000000102 /* ReceiptParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000102 /* ReceiptParser.swift */; };
+		300000000000000000000103 /* ReceiptReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000103 /* ReceiptReader.swift */; };
+		300000000000000000000104 /* ExpenseIntake.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000104 /* ExpenseIntake.swift */; };
+		300000000000000000000105 /* RukkLinkService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000105 /* RukkLinkService.swift */; };
+		300000000000000000000106 /* MailboxSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000106 /* MailboxSettings.swift */; };
+		300000000000000000000107 /* MIMEMessage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000107 /* MIMEMessage.swift */; };
+		300000000000000000000108 /* IMAPClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000108 /* IMAPClient.swift */; };
+		300000000000000000000109 /* ExpenseMailWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000109 /* ExpenseMailWatcher.swift */; };
 		3000000000000000000000B0 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B0 /* SettingsView.swift */; };
 		3000000000000000000000B1 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B1 /* Assets.xcassets */; };
 		3000000000000000000000C0 /* RUKK.icon in Resources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C0 /* RUKK.icon */; };
@@ -78,6 +88,7 @@
 		2000000000000000000000A8 /* PDFRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFRenderer.swift; sourceTree = "<group>"; };
 		2000000000000000000000B6 /* UBLInvoiceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UBLInvoiceExporter.swift; sourceTree = "<group>"; };
 		2000000000000000000000BC /* BatchExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchExporter.swift; sourceTree = "<group>"; };
+		2000000000000000000000C2 /* VskSummaryExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VskSummaryExporter.swift; sourceTree = "<group>"; };
 		2000000000000000000000E1 /* SubscriptionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionStore.swift; sourceTree = "<group>"; };
 		2000000000000000000000E2 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		2000000000000000000000BA /* CustomerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerDetailView.swift; sourceTree = "<group>"; };
@@ -90,6 +101,15 @@
 		2000000000000000000000F5 /* Expense.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Expense.swift; sourceTree = "<group>"; };
 		2000000000000000000000F6 /* ExpenseListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseListView.swift; sourceTree = "<group>"; };
 		2000000000000000000000F7 /* ExpenseDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseDetailView.swift; sourceTree = "<group>"; };
+		200000000000000000000101 /* RukkEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RukkEnvelope.swift; sourceTree = "<group>"; };
+		200000000000000000000102 /* ReceiptParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptParser.swift; sourceTree = "<group>"; };
+		200000000000000000000103 /* ReceiptReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReceiptReader.swift; sourceTree = "<group>"; };
+		200000000000000000000104 /* ExpenseIntake.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseIntake.swift; sourceTree = "<group>"; };
+		200000000000000000000105 /* RukkLinkService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RukkLinkService.swift; sourceTree = "<group>"; };
+		200000000000000000000106 /* MailboxSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MailboxSettings.swift; sourceTree = "<group>"; };
+		200000000000000000000107 /* MIMEMessage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIMEMessage.swift; sourceTree = "<group>"; };
+		200000000000000000000108 /* IMAPClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IMAPClient.swift; sourceTree = "<group>"; };
+		200000000000000000000109 /* ExpenseMailWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExpenseMailWatcher.swift; sourceTree = "<group>"; };
 		2000000000000000000000B0 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		2000000000000000000000B1 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		2000000000000000000000B2 /* RUKK.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RUKK.entitlements; sourceTree = "<group>"; };
@@ -173,8 +193,33 @@
 				1000000000000000000000D8 /* PDF */,
 				1000000000000000000000D9 /* Export */,
 				1000000000000000000000DB /* Subscription */,
+				100000000000000000000101 /* Link */,
+				100000000000000000000102 /* Mail */,
 			);
 			path = RUKK;
+			sourceTree = "<group>";
+		};
+		100000000000000000000101 /* Link */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000101 /* RukkEnvelope.swift */,
+				200000000000000000000102 /* ReceiptParser.swift */,
+				200000000000000000000103 /* ReceiptReader.swift */,
+				200000000000000000000104 /* ExpenseIntake.swift */,
+				200000000000000000000105 /* RukkLinkService.swift */,
+			);
+			path = Link;
+			sourceTree = "<group>";
+		};
+		100000000000000000000102 /* Mail */ = {
+			isa = PBXGroup;
+			children = (
+				200000000000000000000106 /* MailboxSettings.swift */,
+				200000000000000000000107 /* MIMEMessage.swift */,
+				200000000000000000000108 /* IMAPClient.swift */,
+				200000000000000000000109 /* ExpenseMailWatcher.swift */,
+			);
+			path = Mail;
 			sourceTree = "<group>";
 		};
 		1000000000000000000000D5 /* Models */ = {
@@ -238,6 +283,7 @@
 			children = (
 				2000000000000000000000B6 /* UBLInvoiceExporter.swift */,
 				2000000000000000000000BC /* BatchExporter.swift */,
+				2000000000000000000000C2 /* VskSummaryExporter.swift */,
 			);
 			path = Export;
 			sourceTree = "<group>";
@@ -348,6 +394,7 @@
 				3000000000000000000000A8 /* PDFRenderer.swift in Sources */,
 				3000000000000000000000B6 /* UBLInvoiceExporter.swift in Sources */,
 				3000000000000000000000BC /* BatchExporter.swift in Sources */,
+				3000000000000000000000C2 /* VskSummaryExporter.swift in Sources */,
 				3000000000000000000000BA /* CustomerDetailView.swift in Sources */,
 				3000000000000000000000BB /* DashboardView.swift in Sources */,
 				3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */,
@@ -363,6 +410,15 @@
 				3000000000000000000000F5 /* Expense.swift in Sources */,
 				3000000000000000000000F6 /* ExpenseListView.swift in Sources */,
 				3000000000000000000000F7 /* ExpenseDetailView.swift in Sources */,
+				300000000000000000000101 /* RukkEnvelope.swift in Sources */,
+				300000000000000000000102 /* ReceiptParser.swift in Sources */,
+				300000000000000000000103 /* ReceiptReader.swift in Sources */,
+				300000000000000000000104 /* ExpenseIntake.swift in Sources */,
+				300000000000000000000105 /* RukkLinkService.swift in Sources */,
+				300000000000000000000106 /* MailboxSettings.swift in Sources */,
+				300000000000000000000107 /* MIMEMessage.swift in Sources */,
+				300000000000000000000108 /* IMAPClient.swift in Sources */,
+				300000000000000000000109 /* ExpenseMailWatcher.swift in Sources */,
 				3000000000000000000000B0 /* SettingsView.swift in Sources */,
 				3000000000000000000000E1 /* SubscriptionStore.swift in Sources */,
 				3000000000000000000000E2 /* PaywallView.swift in Sources */,

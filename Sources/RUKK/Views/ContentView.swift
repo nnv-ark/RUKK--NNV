@@ -13,6 +13,9 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.colorScheme) private var colorScheme
     @Environment(ImportInbox.self) private var inbox
+    /// Bein tenging við Bill To Book — nil ef þjónustan er ekki í umhverfinu (forsýn).
+    @Environment(RukkLinkService.self) private var link: RukkLinkService?
+    @Environment(ExpenseMailWatcher.self) private var mailWatcher: ExpenseMailWatcher?
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
     @AppStorage("kulaNormalizedV1") private var didNormalize = false
@@ -33,6 +36,9 @@ struct ContentView: View {
     /// Innflutningur viðskiptavina (xlsx / CSV / XML) — hér svo ⌘I virki óháð völdum
     /// flipa. Ferlið sjálft býr í `CustomerImportFlow`.
     @State private var customerImport = CustomerImportFlow()
+
+    /// VSK-yfirlit fyrir VSKIL: tímabil valið í þessu spjaldi, útflutningur sjálfur í VskExportView.
+    @State private var synaVskExport = false
 
     /// Gluggamyndin sjálf. Aðskilin frá `body` svo hvorug keðjan verði of löng
     /// fyrir þýðandann (hann gefst upp á að tegundagreina eina risakeðju).
@@ -69,6 +75,19 @@ struct ContentView: View {
                 normalizeData()
                 didNormalize = true
             }
+            // Ræsa móttökur kostnaðarkvittana: beina tenginguna og póstvaktina.
+            link?.start()
+            mailWatcher?.startPolling(context: context) { [context] in
+                // Lesið ferskt í hvert skipti svo fyrirtækjaskipti gildi líka.
+                AppSettings.active(in: context,
+                                   activeID: UserDefaults.standard.string(forKey: "activeCompanyID") ?? "")
+            }
+        }
+        .onChange(of: link?.latestExpense) { _, expense in
+            // Kvittun barst beint úr símanum — færa valið á nýju færsluna.
+            guard let expense else { return }
+            selection = .expenses
+            selectedExpense = expense
         }
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
@@ -91,6 +110,12 @@ struct ContentView: View {
         .focusedSceneValue(\.newInvoice, createInvoice)
         .focusedSceneValue(\.newEstimate, createEstimate)
         .focusedSceneValue(\.importCustomers, beginCustomerImport)
+        .focusedSceneValue(\.exportVSKSummary) { synaVskExport = true }
+        .sheet(isPresented: $synaVskExport) {
+            if let company = activeCompany {
+                VskExportView(company: company)
+            }
+        }
         .customerImport(customerImport, company: activeCompany)
     }
 
@@ -404,4 +429,107 @@ struct ContentView: View {
     ContentView()
         .environment(ImportInbox())
         .modelContainer(for: [Invoice.self, LineItem.self, Contact.self, AppSettings.self, CustomStatus.self, Expense.self], inMemory: true)
+}
+
+// MARK: - VSK-yfirlit fyrir VSKIL
+
+/// Spjald sem lætur notanda velja ár og tveggja mánaða tímabil og flytur út
+/// VSK-yfirlit (JSON) sem VSKIL les inn í virðisaukaskattsskýrsluna.
+/// Upphæðir koma úr útgefnum reikningum (bókunardegi rænt) og kostnaði —
+/// sjá `VskSummaryExporter`.
+private struct VskExportView: View {
+    let company: AppSettings
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var ar: Int
+    @State private var timabilNr: Int
+    @State private var synaStodu = false
+    @State private var villa: String?
+
+    /// Sjálfgefið val: tímabilið sem í dagurinn fellur í.
+    init(company: AppSettings) {
+        self.company = company
+        let kal = Calendar.current
+        let nu = Date()
+        _ar = State(initialValue: kal.component(.year, from: nu))
+        _timabilNr = State(initialValue: (kal.component(.month, from: nu) + 1) / 2)
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Text("VSK-yfirlit fyrir VSKIL")
+                .font(.headline)
+            Text("\(company.displayName) — \(VskSummaryExporter.timabilHeiti(timabilNr: timabilNr)) \(ar) (tímabil \(VskSummaryExporter.rskNumer(timabilNr: timabilNr)))")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Form {
+                Picker("Ár", selection: $ar) {
+                    ForEach((ar - 3)...(ar + 1), id: \.self) { a in
+                        Text(String(a)).tag(a)
+                    }
+                }
+                Picker("Tímabil", selection: $timabilNr) {
+                    ForEach(1...6, id: \.self) { n in
+                        Text("\(VskSummaryExporter.timabilHeiti(timabilNr: n)) — \(VskSummaryExporter.rskNumer(timabilNr: n))").tag(n)
+                    }
+                }
+            }
+            .formStyle(.grouped)
+            .frame(width: 320)
+
+            if let villa {
+                Label(villa, systemImage: "exclamationmark.triangle")
+                    .font(.callout).foregroundStyle(.red)
+            }
+            if synaStodu {
+                Label("VSK-yfirlit vistað — opnaðu það í VSKIL („Hlaupa úr RUKK…“).",
+                      systemImage: "checkmark.circle.fill")
+                    .font(.callout).foregroundStyle(.green)
+            }
+
+            HStack {
+                Button("Hætta") { dismiss() }
+                    .keyboardShortcut(.cancelAction)
+                Spacer()
+                Button("Flytja út…") { flytjaUt() }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(20)
+        .frame(width: 380)
+    }
+
+    /// Reiknar yfirlit fyrir valið tímabil og býður upp á að vista sem
+    /// `_vskil-<kennitala>-<ár>-<tímabil>.json`.
+    private func flytjaUt() {
+        villa = nil
+        let invoices = (try? context.fetch(FetchDescriptor<Invoice>())) ?? []
+        let expenses = (try? context.fetch(FetchDescriptor<Expense>())) ?? []
+        let payload = VskSummaryExporter.payload(invoices: invoices, expenses: expenses,
+                                                 company: company,
+                                                 ar: ar, timabilNr: timabilNr,
+                                                 kal: .current)
+        let gogn: Data
+        do {
+            gogn = try VskSummaryExporter.gogn(payload)
+        } catch {
+            villa = String(localized: "Ekki tókst að kóða yfirlitið.")
+            return
+        }
+
+        let panel = NSSavePanel()
+        panel.allowedContentTypes = [.json]
+        panel.nameFieldStringValue = "_vskil-\(company.companyNationalID)-\(ar)-\(VskSummaryExporter.rskNumer(timabilNr: timabilNr)).json"
+        panel.message = String(localized: "Veldu hvar VSK-yfirlitið skal vera vistað")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            try gogn.write(to: url, options: .atomic)
+            synaStodu = true
+        } catch {
+            villa = String(localized: "Ekki tókst að vista skrána.")
+        }
+    }
 }

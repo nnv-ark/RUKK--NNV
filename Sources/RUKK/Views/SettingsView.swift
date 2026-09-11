@@ -104,8 +104,91 @@ private struct SettingsTabs: View {
 
             LanguageTab(settings: settings)
                 .tabItem { Label("Tungumál", systemImage: "globe") }
+
+            MailWatchTab()
+                .tabItem { Label("Póstvakt", systemImage: "envelope.badge") }
         }
         .padding()
+    }
+}
+
+// MARK: - Póstvakt (Kostnaður ← tölvupóstur)
+
+/// Stillingar pósvaktarinnar — IMAP-fang sem Bill To Book (eða annar) sendir
+/// kvittanir á. Lykilorð/umbóðskóði geymist í Keychain, aldrei í UserDefaults.
+private struct MailWatchTab: View {
+    @Environment(ExpenseMailWatcher.self) private var watcher: ExpenseMailWatcher?
+    @State private var password = ""
+    @State private var testResult: String?
+
+    var body: some View {
+        Form {
+            Section("Pósthólf") {
+                Toggle("Vakta pósthólf", isOn: Binding(
+                    get: { watcher?.settings.isEnabled ?? false },
+                    set: { watcher?.settings.isEnabled = $0 }))
+                TextField("Póstþjónn (IMAP)", text: Binding(
+                    get: { watcher?.settings.host ?? "" },
+                    set: { watcher?.settings.host = $0 }),
+                    prompt: Text("imap.gmail.com"))
+                TextField("Gátt", value: Binding(
+                    get: { watcher?.settings.port ?? 993 },
+                    set: { watcher?.settings.port = $0 }), format: .number)
+                TextField("Notandanafn (netfang)", text: Binding(
+                    get: { watcher?.settings.username ?? "" },
+                    set: { watcher?.settings.username = $0 }),
+                    prompt: Text("kvittanir@example.is"))
+                SecureField("Lykilorð / umbóðskóði", text: $password,
+                            prompt: Text("geymst í Keychain"))
+                    .onChange(of: password) { _, new in
+                        guard !new.isEmpty else { return }
+                        watcher?.settings.setPassword(new)
+                        password = ""
+                        testResult = String(localized: "Lykilorð vistað í Keychain.")
+                    }
+                TextField("Pósthólf", text: Binding(
+                    get: { watcher?.settings.mailbox ?? "INBOX" },
+                    set: { watcher?.settings.mailbox = $0.isEmpty ? "INBOX" : $0 }))
+            }
+            Section {
+                Text("Bill To Book sendir skannið í tölvupósti á þetta netfang. RUKK sækir ólesnar kvittanir reglulega á meðan appið er opið, les þær og stofnar kostnaðarfærslur. Notaðu app-lykilorð / umbóðskóða frá póstþjónustunni — ekki venjulegt innskráningarlykilorð.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    Button("Prófa tengingu") { testConnection() }
+                        .disabled(watcher == nil)
+                    if let testResult {
+                        Text(testResult)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+    }
+
+    private func testConnection() {
+        guard let watcher else { return }
+        let settings = watcher.settings
+        testResult = String(localized: "Prófar…")
+        Task {
+            do {
+                guard let password = settings.password() else {
+                    testResult = String(localized: "Lykilorð vantar.")
+                    return
+                }
+                let client = IMAPClient(host: settings.host, port: UInt16(settings.port))
+                try await client.connect()
+                try await client.login(username: settings.username, password: password)
+                try await client.select(mailbox: settings.mailbox)
+                await client.logout()
+                testResult = String(localized: "Tenging í lagi ✓")
+            } catch {
+                testResult = error.localizedDescription
+            }
+        }
     }
 }
 
