@@ -26,10 +26,13 @@ actor IMAPClient {
 
     private let host: String
     private let port: UInt16
+    /// TLS er sjálfgefið — aðeins óvirkt í einingaprófum gegn loopback-þjóni.
+    private let useTLS: Bool
 
-    init(host: String, port: UInt16 = 993) {
+    init(host: String, port: UInt16 = 993, useTLS: Bool = true) {
         self.host = host
         self.port = port
+        self.useTLS = useTLS
     }
 
     deinit { connection?.cancel() }
@@ -37,12 +40,14 @@ actor IMAPClient {
     // MARK: - Opinber aðgerðir
 
     func connect() async throws {
-        let tls = NWParameters(tls: NWProtocolTLS.Options())
+        let params: NWParameters = useTLS
+            ? NWParameters(tls: NWProtocolTLS.Options())
+            : .tcp
         let endpoint = NWEndpoint.hostPort(
             host: NWEndpoint.Host(host),
             port: NWEndpoint.Port(rawValue: port) ?? 993
         )
-        let connection = NWConnection(to: endpoint, using: tls)
+        let connection = NWConnection(to: endpoint, using: params)
         self.connection = connection
         try await waitUntilReady(connection)
         _ = try await readUntilTaggedOrGreeting()   // "* OK ..." kveðja
@@ -156,11 +161,19 @@ actor IMAPClient {
 
     // MARK: - Lestur af streymi
 
+    /// Afgangur af síðasta TCP-bút. Indeksar eru alltaf leystir í gegnum
+    /// `consumed` — aldrei removeFirst/removeSubrange á Data, sem er frægt
+    /// fyrir slicing-hrunum (EXC_BREAKPOINT) þegar svarið kemur í köflum.
+    private var consumed = 0
+    private static let crlf = Data([0x0D, 0x0A])
+
     private func readLine() async throws -> Data {
         while true {
-            if let range = buffer.range(of: Data("\r\n".utf8)) {
-                let line = buffer.subdata(in: 0 ..< range.lowerBound)
-                buffer.removeSubrange(0 ..< range.upperBound)
+            if let range = buffer.range(of: Self.crlf, options: [],
+                                        in: consumed ..< buffer.endIndex) {
+                let line = Data(buffer[consumed ..< range.lowerBound])
+                consumed = range.upperBound
+                compactBuffer()
                 return line
             }
             try await receiveMore()
@@ -168,11 +181,19 @@ actor IMAPClient {
     }
 
     private func readBytes(_ n: Int) async throws -> Data {
-        while buffer.count < n { try await receiveMore() }
-        let out = buffer.prefix(n)
-        buffer.removeFirst(n)
+        while buffer.count - consumed < n { try await receiveMore() }
+        let out = Data(buffer[consumed ..< consumed + n])
+        consumed += n
+        compactBuffer()
         // Eftir literal kemur afgangslína — hún er lesin af readLine() í næstu lotu.
         return out
+    }
+
+    /// Flatir buffer þegar mikið hefur verið lesið — sjaldgæft, ekki í hverri línu.
+    private func compactBuffer() {
+        guard consumed > 65536 else { return }
+        buffer = Data(buffer[consumed...])
+        consumed = 0
     }
 
     private func receiveMore() async throws {

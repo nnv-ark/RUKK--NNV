@@ -35,26 +35,28 @@ enum ExpenseIntake {
         }
 
         // OCR: Vision keyrður undan aðalþræði, uppfærsla færslunnar á aðalþræði.
-        let id = expense.persistentModelID
+        // Líkanið sjálft er greipt — ekki persistentModelID, sem er TÍMABUNDIÐ
+        // uns context er vistað (save() gerist í fetchUnseen) og úrelta
+        // auðkennið olli SwiftData assertion-hruni.
         let receiptCopy = receipt
-        Task { @MainActor [context] in
+        Task { @MainActor [expense] in
             let lines = await Task.detached(priority: .utility) {
                 await ReceiptReader.textLines(from: receiptCopy)
             }.value
             let parsed = ReceiptParser.parse(lines: lines)
             guard parsed.vendor != nil || parsed.total != nil || parsed.date != nil else { return }
-            guard let target = context.model(for: id) as? Expense else { return }
-            if target.vendor.isEmpty, let vendor = parsed.vendor {
-                target.vendor = vendor
+            guard expense.modelContext != nil else { return }   // eytt á meðan
+            if expense.vendor.isEmpty, let vendor = parsed.vendor {
+                expense.vendor = vendor
             }
-            if target.amount == 0, let total = parsed.total {
-                target.amount = total
+            if expense.amount == 0, let total = parsed.total {
+                expense.amount = total
             }
             if let rate = parsed.vatRate, parsed.total != nil {
-                target.taxRate = rate
+                expense.taxRate = rate
             }
             if let parsedDate = parsed.date, date == nil {
-                target.date = parsedDate
+                expense.date = parsedDate
             }
         }
         return expense

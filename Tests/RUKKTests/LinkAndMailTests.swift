@@ -1,5 +1,6 @@
 import XCTest
 import Foundation
+import Network
 @testable import RUKK
 
 final class LinkAndMailTests: XCTestCase {
@@ -111,5 +112,104 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(message.subject, "Halló")
         XCTAssertTrue(message.attachments.isEmpty)
         XCTAssertTrue(message.bodyText.contains("Bara texti"))
+    }
+
+    // MARK: - IMAPClient streymislestur (regression: hrun við köflótt svar)
+
+    /// Hermi-IMAPþjónn á loopback sem svarar í litlum TCP-bútum. Sannreynir að
+    /// readLine/readBytes þoli svar sem berst í köflum — fyrri útgáfa krafaði
+    /// EXC_BREAKPOINT í Data.subdata þegar Gmail skilaði FETCH-svari í bútum.
+    func testFetchAcrossTCPChunks() async throws {
+        let message = (1...40).map { "Lína \($0): KVITTUN 12.500 kr" }
+            .joined(separator: "\r\n")
+        let server = try MiniIMAPServer(messageBody: Data(message.utf8))
+        let port = try server.start()
+        defer { server.stop() }
+
+        let client = IMAPClient(host: "127.0.0.1", port: port, useTLS: false)
+        try await client.connect()
+        try await client.login(username: "procurator@example.is", password: "x")
+        try await client.select(mailbox: "INBOX")
+        let uids = try await client.searchUnseen()
+        XCTAssertEqual(uids, [42])
+        let fetched = try await client.fetchMessage(uid: 42)
+        XCTAssertEqual(fetched, Data(message.utf8))
+        try await client.markSeen(uid: 42)
+        await client.logout()
+    }
+}
+
+// MARK: - MiniIMAPServer (prófunarþjónn á loopback)
+
+/// Lágmarks IMAP-hermir: kveður, svarar LOGIN/SELECT/SEARCH/FETCH/STORE/LOGOUT.
+/// Sendir allt í 7-bæta köflum til að herma eftir köflóttri afhendingu Gmail.
+private final class MiniIMAPServer: @unchecked Sendable {
+    private let messageBody: Data
+    private var listener: NWListener?
+
+    init(messageBody: Data) { self.messageBody = messageBody }
+
+    func start() throws -> UInt16 {
+        let listener = try NWListener(using: .tcp, on: .any)
+        self.listener = listener
+        listener.newConnectionHandler = { [messageBody] conn in
+            conn.start(queue: .global())
+            MiniIMAPServer.serve(conn, messageBody: messageBody, buffer: Data())
+        }
+        // Bíða eftir ready-stöðu áður en tenging er reind — port er ekki
+        // bindað fyrr en listener nær .ready (annars EADDRNOTAVAIL).
+        let semaphore = DispatchSemaphore(value: 0)
+        listener.stateUpdateHandler = { state in
+            if case .ready = state { semaphore.signal() }
+        }
+        listener.start(queue: .global())
+        guard semaphore.wait(timeout: .now() + 5) == .success,
+              let port = listener.port?.rawValue else {
+            throw NSError(domain: "test", code: 1)
+        }
+        return port
+    }
+
+    func stop() { listener?.cancel() }
+
+    private static func serve(_ conn: NWConnection, messageBody: Data, buffer: Data) {
+        if buffer.isEmpty {
+            sendChunked(conn, Data("* OK MiniIMAP tilbúinn\r\n".utf8))
+        }
+        conn.receive(minimumIncompleteLength: 1, maximumLength: 4096) { data, _, isComplete, _ in
+            guard let data, !isComplete else { conn.cancel(); return }
+            var acc = buffer + data
+            while let r = acc.range(of: Data([0x0D, 0x0A])) {
+                let line = String(decoding: acc[acc.startIndex ..< r.lowerBound], as: UTF8.self)
+                acc = Data(acc[r.upperBound...])
+                let tag = line.split(separator: " ").first.map(String.init) ?? "a1"
+                let response: Data
+                if line.contains("LOGIN") || line.contains("SELECT") || line.contains("STORE") {
+                    response = Data("\(tag) OK\r\n".utf8)
+                } else if line.contains("UID SEARCH") {
+                    response = Data("* SEARCH 42\r\n\(tag) OK\r\n".utf8)
+                } else if line.contains("UID FETCH") {
+                    let n = messageBody.count
+                    var r2 = Data("* 1 FETCH (UID 42 BODY[] {\(n)}\r\n".utf8)
+                    r2.append(messageBody)
+                    r2.append(Data(")\r\n\(tag) OK\r\n".utf8))
+                    response = r2
+                } else {
+                    response = Data("\(tag) OK\r\n".utf8)
+                }
+                sendChunked(conn, response)
+            }
+            serve(conn, messageBody: messageBody, buffer: acc)
+        }
+    }
+
+    /// Sendir í 7-bæta köflum með smá millibili — hermir eftir raunneti.
+    private static func sendChunked(_ conn: NWConnection, _ data: Data) {
+        var offset = 0
+        while offset < data.count {
+            let end = min(offset + 7, data.count)
+            conn.send(content: data[offset ..< end], completion: .idempotent)
+            offset = end
+        }
     }
 }

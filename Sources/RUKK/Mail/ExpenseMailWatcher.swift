@@ -55,13 +55,16 @@ final class ExpenseMailWatcher {
     func checkNow(context: ModelContext, activeCompany: () -> AppSettings?) async {
         guard state != .checking else { return }
         guard settings.isConfigured else {
+            watchLog.warning("Póstvakt: ekki stillt (host/username/lykilorð vantar) — sleppi")
             state = .failed(String(localized: "Póstvakt er ekki stillt — sjá Stillingar → Póstvakt."))
             return
         }
         state = .checking
+        watchLog.info("Póstvakt: sæki ólesin skilaboð af \(self.settings.host, privacy: .public)/\(self.settings.mailbox, privacy: .public)")
         defer { lastChecked = .now }
         do {
             let fetched = try await fetchUnseen(context: context, activeCompany: activeCompany)
+            watchLog.info("Póstvakt: \(fetched) kvittun sótt")
             state = .ok(fetched == 0
                         ? String(localized: "Engin ný kvittun")
                         : String(localized: "\(fetched) kvittun sótt"))
