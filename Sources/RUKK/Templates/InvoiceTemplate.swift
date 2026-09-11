@@ -417,17 +417,19 @@ struct InvoicePage: View {
     // MARK: - Samtölur
 
     fileprivate var totalsRow: some View {
-        HStack(alignment: .top) {
+        // Sömu námunduðu upphæðir og í rafræna reikningnum — PDF og UBL ríma alltaf.
+        let totals = EInvoiceTotals(invoice: invoice)
+        return HStack(alignment: .top) {
             Spacer()
             VStack(alignment: .trailing, spacing: 5) {
-                tRow(s.subtotalExclVAT, s.currency(invoice.subtotal))
-                if invoice.discountValue > 0 {
+                tRow(s.subtotalExclVAT, s.currency(totals.lineExtension))
+                if totals.allowanceTotal > 0 {
                     tRow(s.discountLabel(s.amountString(invoice.discountAmount)),
-                         "-" + s.currency(invoice.discountValue))
-                    tRow(s.taxableBase, s.currency(invoice.taxableBase))
+                         "-" + s.currency(totals.allowanceTotal))
+                    tRow(s.taxableBase, s.currency(totals.taxExclusive))
                 }
-                tRow(s.vat, s.currency(invoice.taxValue))
-                tRow(s.totalInclVAT, s.currency(invoice.total), bold: true)
+                tRow(s.vat, s.currency(totals.taxTotal))
+                tRow(s.totalInclVAT, s.currency(totals.taxInclusive), bold: true)
             }
             .frame(width: 260)
         }

@@ -40,8 +40,14 @@ Also in this version:
 Found in review during this cycle and deliberately deferred — decide before submitting.
 The one-page PDF defect that stood here is fixed in this release.
 
-1. **Credit notes export invalid e-invoices.** UBL type code 381 is written into
+Both items below were fixed on main after 1.5 shipped and go out in 1.6:
+
+1. ~~**Credit notes export invalid e-invoices.** UBL type code 381 is written into
    an `<Invoice>` root with negated quantities; PEPPOL requires a `<CreditNote>`
-   root and rejects negative totals.
-2. **Rounding happens only at XML-print time**, per value, so the sum of the line
-   amounts can disagree with the document total (BR-CO-10).
+   root and rejects negative totals.~~ **Fixed:** credit notes now export as a
+   `<CreditNote>` root with `CreditedQuantity`, positive amounts and a
+   `BillingReference` to the credited invoice.
+2. ~~**Rounding happens only at XML-print time**, per value, so the sum of the line
+   amounts can disagree with the document total (BR-CO-10).~~ **Fixed:** every
+   amount rounds exactly once and all totals derive from the rounded parts; the
+   PDF totals row uses the same figures, so PDF and XML always reconcile.

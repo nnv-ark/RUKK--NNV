@@ -76,12 +76,14 @@ Sources/RUKK/
   RUKKApp.swift          App entry point + menu commands
   FocusedActions.swift   Menu-command plumbing (⌘N, ⌘P, export …)
   Models/                Invoice, LineItem, Contact, AppSettings (company), CustomStatus, Money
-  Views/                 ContentView, Dashboard, invoice list/detail, customers, settings
-  Templates/             IcelandicTemplate (SwiftUI → PDF)
+  Views/                 ContentView, Dashboard, invoice list/detail, customers, settings, drag & drop
+  Templates/             IcelandicTemplate (SwiftUI → PDF), QR code
   PDF/                   PDF rendering, printing, Page Setup, Preview, email
-  Export/                UBL/TS-136 XML exporter, batch exporter
-  Import/                Contacts.app importer
-Tests/RUKKTests/         Invoice math, settings, and UBL export tests
+  Export/                UBL/TS-136 XML exporter (invoices and credit notes), batch exporter
+  Subscription/          StoreKit paywall and subscription store
+  BlizzImporter / TymeImporter / CalendarImporter / CustomerImport / InvoiceImport / XLSXReader
+                         Time-entry and customer importers
+Tests/RUKKTests/         Invoice math, rounding, pagination, credit notes, importers, and UBL export tests
 App/                     Assets, entitlements
 ```
 

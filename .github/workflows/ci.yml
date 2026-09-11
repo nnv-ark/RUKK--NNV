@@ -24,3 +24,8 @@ jobs:
 
       - name: Test
         run: swift test
+
+      # Appið sjálft (m.a. RUKKApp.swift) er utan SwiftPM-marksins —
+      # það byggist því sérstaklega svo villur þar komi ekki óvart í Archive.
+      - name: Build the app target
+        run: xcodebuild -project RUKK.xcodeproj -scheme RUKK -destination 'platform=macOS' build CODE_SIGNING_ALLOWED=NO
