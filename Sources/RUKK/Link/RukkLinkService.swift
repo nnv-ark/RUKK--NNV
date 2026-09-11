@@ -1,6 +1,7 @@
 import Foundation
 import MultipeerConnectivity
 import SwiftData
+import SystemConfiguration
 import os
 
 private let linkLog = Logger(subsystem: "is.calmail.kula", category: "link")
@@ -36,10 +37,20 @@ final class RukkLinkService: NSObject {
         super.init()
     }
 
+    /// Nafn Macsins eins og Bill To Book sýnir það („RUKK · <nafn>"). Í sandbox
+    /// gefur Host.current().localizedName nafnlausan tilfallastreng — ComputerName
+    /// úr SystemConfiguration er raunverulega heitið sem notandinn þekkir.
+    private static func macName() -> String {
+        if let name = SCDynamicStoreCopyComputerName(nil, nil) as String?, !name.isEmpty {
+            return name
+        }
+        return ProcessInfo.processInfo.hostName.components(separatedBy: ".").first ?? "RUKK"
+    }
+
     /// Hefur auglýsingu á staðarnetinu. Kallað við ræsingu — öruggt að kalla aftur.
     func start() {
         guard advertiser == nil else { return }
-        let peerID = MCPeerID(displayName: Host.current().localizedName ?? "RUKK")
+        let peerID = MCPeerID(displayName: Self.macName())
         myPeerID = peerID
         let session = MCSession(peer: peerID, securityIdentity: nil,
                                 encryptionPreference: .required)
