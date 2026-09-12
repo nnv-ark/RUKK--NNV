@@ -50,20 +50,42 @@ enum ExpenseIntake {
             let parsed = ReceiptParser.parse(lines: lines)
             guard parsed.vendor != nil || parsed.total != nil || parsed.date != nil else { return }
             guard expense.modelContext != nil else { return }   // eytt á meðan
-            if expense.vendor.isEmpty, let vendor = parsed.vendor {
-                expense.vendor = vendor
-            }
-            if expense.amount == 0, let total = parsed.total {
-                expense.amount = total
-            }
-            if let rate = parsed.vatRate, parsed.total != nil {
-                expense.taxRate = rate
-            }
-            if let parsedDate = parsed.date, date == nil {
-                expense.date = parsedDate
-            }
+            apply(parsed, to: expense, dateProvided: date != nil)
         }
         return expense
+    }
+
+    /// Fyllir út færslu úr kvittunarlestri — hreint fall, prófanlegt án OCR.
+    /// Tvö eða fleiri VSK-þrep með nettó og VSK á línu (sundurliðunartaflan
+    /// neðst á kvittunum: „VSK 11% 1.432 158") virkja sundurliðun sjálfkrafa.
+    static func apply(_ parsed: ParsedReceipt, to expense: Expense, dateProvided: Bool) {
+        if expense.vendor.isEmpty, let vendor = parsed.vendor {
+            expense.vendor = vendor
+        }
+        if expense.amount == 0, let total = parsed.total {
+            expense.amount = total
+        }
+        let rows = parsed.vatLines.compactMap { line -> (rate: Decimal, gross: Decimal)? in
+            guard let net = line.net, let vat = line.vat else { return nil }
+            return (line.rate, net + vat)
+        }
+        if parsed.vatLines.count >= 2, rows.count == parsed.vatLines.count,
+           parsed.total != nil, !expense.isVatSplit {
+            expense.isVatSplit = true
+            for row in rows {
+                switch row.rate {
+                case 24:  expense.splitGross24 += row.gross
+                case 11:  expense.splitGross11 += row.gross
+                default:  expense.splitGross0 += row.gross
+                }
+            }
+        }
+        if !expense.isVatSplit, let rate = parsed.vatRate, parsed.total != nil {
+            expense.taxRate = rate
+        }
+        if let parsedDate = parsed.date, !dateProvided {
+            expense.date = parsedDate
+        }
     }
 
     /// Finnr fyrirtæki í RUKK með sama nafni og Bill To Book sendir (samanburður

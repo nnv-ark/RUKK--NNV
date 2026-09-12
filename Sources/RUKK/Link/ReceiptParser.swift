@@ -6,10 +6,22 @@ struct ParsedReceipt: Equatable, Sendable {
     var date: Date?
     /// Heildarupphæð með VSK.
     var total: Decimal?
-    /// VSK-upphæð ef hún fannst á kvittuninni.
+    /// VSK-upphæð ef hún fannst á kvittuninni (summa þrepalína ef margar).
     var vat: Decimal?
     /// Ályktað VSK-hlutfall (0 / 11 / 24) út frá total og vat.
     var vatRate: Decimal?
+    /// Sundurliðun VSK á þrepum eins og hún er prentuð neðst á kvittunum:
+    /// „VSK 11% 1.432 158", „VSK 24% 8.024 1.926". Fleiri en eitt stak
+    /// þýðir að kvittunin spannar mörg þrep og færslan á að sundurliðast.
+    var vatLines: [VatLine] = []
+
+    /// Ein lína úr VSK-sundurliðun kvittunar. `net` og `vat` eru valfrjáls —
+    /// „VSK 24% innifalinn" hefur hvorugt, „Þar af VSK 11% 216" aðeins vat.
+    struct VatLine: Equatable, Sendable {
+        var rate: Decimal
+        var net: Decimal?
+        var vat: Decimal?
+    }
 }
 
 /// Les útgildi úr OCR-texta kvittunar. Hrein föll án kerfiskalla — prófanleg.
@@ -18,12 +30,16 @@ enum ReceiptParser {
 
     static func parse(lines: [String]) -> ParsedReceipt {
         let clean = lines.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+        let vatLines = guessVatLines(clean)
+        let rates = Set(vatLines.map(\.rate))
         return ParsedReceipt(
             vendor: guessVendor(clean),
             date: guessDate(clean),
             total: guessTotal(clean),
-            vat: guessVat(clean),
-            vatRate: guessVatRate(clean)
+            vat: guessVat(clean, vatLines: vatLines),
+            // Eitt þrep → hlutfallið beint; mörg þrep → sundurliðun (vatRate nil).
+            vatRate: rates.count == 1 ? rates.first : nil,
+            vatLines: vatLines
         ).withInferredRate()
     }
 
@@ -79,13 +95,28 @@ enum ReceiptParser {
             scrubbed = scrubbed.replacingOccurrences(of: pattern, with: " ",
                                                      options: .regularExpression)
         }
+        // OCR les stundum þúsundaskilapunkt sem kommu: „1,926" (átti að vera
+        // „1.926"). Komma með nákvæmlega 3 tölum á eftir er þúsundaskil —
+        // raunverulegir aukastafir á kvittunum eru 1–2 („12,50").
+        scrubbed = scrubbed.replacingOccurrences(of: #"\b(\d{1,3}),(\d{3})\b"#,
+                                                 with: "$1.$2", options: .regularExpression)
         let pattern = #"\d{1,3}(?:[ .]\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?"#
         return (try? NSRegularExpression(pattern: pattern))
             .map { re in
                 re.matches(in: scrubbed, range: NSRange(scrubbed.startIndex..., in: scrubbed))
                     .compactMap { Range($0.range, in: scrubbed) }
-                    .compactMap { parseAmount(String(scrubbed[$0])) }
+                    .flatMap { splitMergedAmounts(String(scrubbed[$0])) }
+                    .compactMap { parseAmount($0) }
             } ?? []
+    }
+
+    /// „1.432 158" er tvær dálkaupphæðir sem talnamynstrið sameinaði (bil er
+    /// einnig þúsundaskil). Aðskilur þegar bæði punktur OG bil koma fyrir í
+    /// sama fangi — sönn þúsundaskipt tala notar sama tákn í gegn
+    /// („1.432.158" eða „1 432 158"), aldrei blöndu.
+    private static func splitMergedAmounts(_ s: String) -> [String] {
+        guard s.contains(" "), s.contains(".") else { return [s] }
+        return s.split(separator: " ").map(String.init)
     }
 
     /// Upphæðir af línu sem inniheldur EKKI bókstafi — eingöngu tölur,
@@ -121,22 +152,11 @@ enum ReceiptParser {
         return lines.flatMap(amounts).max()
     }
 
-    /// VSK-upphæð: lína með „vsk" — sleppa prósentutölunni (henni fylgir %).
-    private static func guessVat(_ lines: [String]) -> Decimal? {
-        for line in lines {
-            let lower = line.lowercased()
-            guard lower.contains("vsk") || lower.contains("virðisaukaskattur") else { continue }
-            let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
-                                                           with: "", options: .regularExpression)
-            if let amount = amounts(in: withoutPercent).max() { return amount }
-        }
-        return nil
-    }
-
-    /// VSK-hlutfall beint af kvittuninni: „VSK 24% innifalinn", „Þar af VSK 11% 495".
-    /// Sterkasta merkið sem til er — prósentan er prentuð af kassanum sjálfum,
-    /// og virkar jafnvel þegar VSK-upphæðin lesist ekki (t.d. „innifalinn"-lína).
-    private static func guessVatRate(_ lines: [String]) -> Decimal? {
+    /// VSK-sundurliðunarlínur: allar línur með „vsk" OG prósentu.
+    /// Tvær upphæðir á línu = nettó og VSK (VSK er alltaf minna því
+    /// hlutföllin eru undir 100%); ein upphæð = VSK-upphæðin ein.
+    private static func guessVatLines(_ lines: [String]) -> [ParsedReceipt.VatLine] {
+        var result: [ParsedReceipt.VatLine] = []
         for line in lines {
             let lower = line.lowercased()
             guard lower.contains("vsk") || lower.contains("virðisaukaskattur") else { continue }
@@ -145,7 +165,29 @@ enum ReceiptParser {
                   let r = Range(m.range(at: 1), in: line),
                   let pct = Decimal(string: line[r].replacingOccurrences(of: ",", with: "."))
             else { continue }
-            for rate: Decimal in [24, 11] where abs(pct - rate) < 1.5 { return rate }
+            guard let rate = [Decimal(24), Decimal(11)].first(where: { abs(pct - $0) < 1.5 })
+            else { continue }
+            let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
+                                                           with: "", options: .regularExpression)
+            let found = amounts(in: withoutPercent).sorted(by: >)
+            result.append(.init(rate: rate,
+                                net: found.count >= 2 ? found[0] : nil,
+                                vat: found.count >= 2 ? found[1] : found.first))
+        }
+        return result
+    }
+
+    /// Heildar-VSK: summa þrepalína ef þær hafa upphæðir; annars samantekt-
+    /// línan án prósentu („Þar af VSK 2.083", „VSK 495").
+    private static func guessVat(_ lines: [String], vatLines: [ParsedReceipt.VatLine]) -> Decimal? {
+        let lineSum = vatLines.compactMap(\.vat).reduce(0, +)
+        if lineSum > 0 { return lineSum }
+        for line in lines {
+            let lower = line.lowercased()
+            guard lower.contains("vsk") || lower.contains("virðisaukaskattur") else { continue }
+            let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
+                                                           with: "", options: .regularExpression)
+            if let amount = amounts(in: withoutPercent).max() { return amount }
         }
         return nil
     }

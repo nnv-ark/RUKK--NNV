@@ -160,6 +160,71 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(ReceiptParser.parse(lines: lines).vatRate, 11)
     }
 
+    /// Sundurliðunartaflan neðst á Rafha-kvittun: „VSK 11% 1.432 158" og
+    /// „VSK 24.0% 8.024 1.926" — tvö þrep með nettó og VSK á hverri línu.
+    func testVatBreakdownLines() {
+        let lines = [
+            "RAFHA",
+            "Samlokugrill 3 in 1 Domo grænt 9.950",
+            "Kaffi Kimbo Nespresso Intenso 795",
+            "Kaffi Kimbo Nespresso Napoli 795",
+            "Samtals ISK með vsk. 11.540",
+            "þar af vsk. 2.083",
+            "VSK 11% 1.432 158",
+            "VSK 24.0% 8.024 1.926",
+        ]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.total, 11_540)
+        XCTAssertEqual(parsed.vatLines.count, 2)
+        let l11 = parsed.vatLines.first { $0.rate == 11 }
+        XCTAssertEqual(l11?.net, 1_432)
+        XCTAssertEqual(l11?.vat, 158)
+        let l24 = parsed.vatLines.first { $0.rate == 24 }
+        XCTAssertEqual(l24?.net, 8_024)
+        XCTAssertEqual(l24?.vat, 1_926)
+        // Heildar-VSK er summa þrepalínanna (2.084) — sundurliðunin ræður
+        // yfir samantektarkassans (2.083) sem kassinn námundaði sérstaklega.
+        XCTAssertEqual(parsed.vat, 2_084)
+        // Mörg þrep → ekki eitt hlutfall heldur sundurliðun.
+        XCTAssertNil(parsed.vatRate)
+    }
+
+    /// Ein þrepalína með aðeins VSK-upphæð („Þar af VSK 11% 216") — óbreytt.
+    func testSingleVatLineStillWorks() {
+        let lines = ["BÓNUS", "SAMTALS 2.179", "Þar af VSK 11% 216"]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.vat, 216)
+        XCTAssertEqual(parsed.vatRate, 11)
+        XCTAssertEqual(parsed.vatLines.count, 1)
+        XCTAssertNil(parsed.vatLines.first?.net)
+    }
+
+    /// OCR les stundum þúsundaskilapunkt sem kommu: „1,926" átti að vera
+    /// „1.926". Komma með 3 tölum á eftir er þúsundaskil, ekki aukastafur.
+    func testCommaMisreadAsThousandsSeparator() {
+        let lines = ["RAFHA", "Samtals ISK með vsk. 11.540",
+                     "VSK 11% 1.432 158", "VSK 24.0% 8.024 1,926"]
+        let parsed = ReceiptParser.parse(lines: lines)
+        let l24 = parsed.vatLines.first { $0.rate == 24 }
+        XCTAssertEqual(l24?.net, 8_024)
+        XCTAssertEqual(l24?.vat, 1_926)
+        XCTAssertEqual(parsed.vat, 2_084)
+    }
+
+    /// Röðsameining: textabútar á sömu sjónröð sameinast vinstri-hægri,
+    /// línur á mismunandi hæð halda sér. Grunnurinn að dálkalesstri.
+    func testJoinRowsMergesColumns() {
+        let rows = ReceiptReader.joinRows([
+            (rect: CGRect(x: 0.05, y: 0.80, width: 0.2, height: 0.02), text: "VSK 11%"),
+            (rect: CGRect(x: 0.60, y: 0.80, width: 0.1, height: 0.02), text: "1.432"),
+            (rect: CGRect(x: 0.80, y: 0.805, width: 0.1, height: 0.02), text: "158"),
+            (rect: CGRect(x: 0.05, y: 0.75, width: 0.2, height: 0.02), text: "VSK 24.0%"),
+            (rect: CGRect(x: 0.60, y: 0.75, width: 0.1, height: 0.02), text: "8.024"),
+            (rect: CGRect(x: 0.80, y: 0.75, width: 0.1, height: 0.02), text: "1,926"),
+        ])
+        XCTAssertEqual(rows, ["VSK 11% 1.432 158", "VSK 24.0% 8.024 1,926"])
+    }
+
     func testISODate() {
         let parsed = ReceiptParser.parse(lines: ["VERSLANA MÍN", "2026-09-11", "SAMTALS 1.000"])
         let comps = Calendar.current.dateComponents([.year, .month, .day], from: try! XCTUnwrap(parsed.date))

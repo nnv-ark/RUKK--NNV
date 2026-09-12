@@ -107,6 +107,36 @@ final class ExpenseTests: XCTestCase {
         XCTAssertEqual(expense.netAmount, 9_306)
     }
 
+    /// Sundurliðun af kvittun (Rafha-dæmið) fyllir þrepin sjálfkrafa við inntöku.
+    func testApplyBreakdownSplitsExpense() throws {
+        let expense = Expense(amount: 0)
+        let parsed = ParsedReceipt(vendor: "RAFHA", date: nil, total: 11_540, vat: 2_084,
+                                   vatRate: nil,
+                                   vatLines: [.init(rate: 11, net: 1_432, vat: 158),
+                                              .init(rate: 24, net: 8_024, vat: 1_926)])
+        ExpenseIntake.apply(parsed, to: expense, dateProvided: false)
+        XCTAssertEqual(expense.vendor, "RAFHA")
+        XCTAssertEqual(expense.amount, 11_540)
+        XCTAssertTrue(expense.isVatSplit)
+        XCTAssertEqual(expense.splitGross11, 1_590)
+        XCTAssertEqual(expense.splitGross24, 9_950)
+        XCTAssertEqual(expense.vatAmount, 2_084)   // 158 + 1.926
+    }
+
+    /// Handvirk sundurliðun er aldrei yfirskrifuð af OCR-lestri.
+    func testApplyDoesNotOverrideManualSplit() throws {
+        let expense = Expense(amount: 11_540)
+        expense.isVatSplit = true
+        expense.splitGross24 = 11_540
+        let parsed = ParsedReceipt(vendor: nil, date: nil, total: 11_540, vat: nil,
+                                   vatRate: nil,
+                                   vatLines: [.init(rate: 11, net: 1_432, vat: 158),
+                                              .init(rate: 24, net: 8_024, vat: 1_926)])
+        ExpenseIntake.apply(parsed, to: expense, dateProvided: false)
+        XCTAssertEqual(expense.splitGross24, 11_540)
+        XCTAssertEqual(expense.splitGross11, 0)
+    }
+
     func testMakeNextUsesCompanyDefaults() throws {
         let context = try makeContext()
         let company = AppSettings()
