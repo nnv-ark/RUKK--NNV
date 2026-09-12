@@ -6,6 +6,9 @@ import AppKit
 /// kvittunarmynd sem má droppa inn — eða sem Bill To Book sendir með færslunni.
 struct ExpenseDetailView: View {
     @Bindable var expense: Expense
+    @Environment(\.modelContext) private var context
+    /// Stöðuskilaboð eftir sjálfvirkan VSKIL-flutning (hakkið „Búið að yfirfara").
+    @State private var vskilStatus: String?
 
     /// Algengir bókhaldsflokkar — tillögur við hlið frjálsa textans.
     private static let suggestedCategories: [String] = [
@@ -74,7 +77,11 @@ struct ExpenseDetailView: View {
             }
 
             Section {
-                Toggle("Búið að yfirfara", isOn: $expense.reviewed)
+                Toggle("Búið að yfirfara", isOn: reviewedBinding)
+            } footer: {
+                if let vskilStatus {
+                    Text(vskilStatus)
+                }
             }
 
             Section("Athugasemd") {
@@ -105,6 +112,19 @@ struct ExpenseDetailView: View {
                     default: expense.splitGross24 = expense.amount
                     }
                 }
+            }
+        )
+    }
+
+    /// Yfirferðarhakkið — og kveikjan á sjálfvirkum VSKIL-flutningi ef hann
+    /// er stilltur (Stillingar → VSKIL). Gildir báðar áttir: afhakað færir
+    /// færsluna út úr yfirlitinu líka.
+    private var reviewedBinding: Binding<Bool> {
+        Binding(
+            get: { expense.reviewed },
+            set: { on in
+                expense.reviewed = on
+                vskilStatus = VskilAutoExport.expenseReviewChanged(expense, in: context)
             }
         )
     }

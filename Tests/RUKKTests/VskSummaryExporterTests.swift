@@ -224,6 +224,29 @@ final class VskSummaryExporterTests: XCTestCase {
         XCTAssertEqual(p.samtala.innskattur24, 1_926)
     }
 
+    /// Sjálfvirkur flutningur: exportPeriod skrifar _vskil-skrá fyrir tímabil
+    /// færslunnar í möppu — sömu skrá og handvirki útflutningurinn myndi gefa.
+    func testExportPeriodSkrifarSkra() throws {
+        let context = try makeContext()
+        let fyrirtaeki = company(context)
+        kostnadur(context, fyrirtaeki: fyrirtaeki, dagur: "2026-09-10",
+                  amount: 5_000, taxRate: 11)
+        let folder = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: folder) }
+
+        let url = try VskilAutoExport.exportPeriod(containing: date("2026-09-10"),
+                                                   company: fyrirtaeki, to: folder,
+                                                   in: context, kal: kal)
+        XCTAssertEqual(url.lastPathComponent, "_vskil-4702221580-2026-40.json")
+        let data = try Data(contentsOf: url)
+        let payload = try JSONDecoder().decode(VskYfirlitPayload.self, from: data)
+        XCTAssertEqual(payload.innkaup.count, 1)
+        XCTAssertEqual(payload.innkaup.first?.vsk, 495)   // kvittunar-námundun
+        XCTAssertEqual(payload.samtala.innskattur11, 495)
+    }
+
     /// VSKIL sannreinir samtölur gegn færslunum — þess vegna verður gagn
     /// sem við smíðum hér að standast þá prófun.
     func testGognStandastVskilSannreiningu() throws {

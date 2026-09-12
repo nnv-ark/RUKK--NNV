@@ -30,6 +30,7 @@
 		3000000000000000000000B6 /* UBLInvoiceExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B6 /* UBLInvoiceExporter.swift */; };
 		3000000000000000000000BC /* BatchExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000BC /* BatchExporter.swift */; };
 		3000000000000000000000C2 /* VskSummaryExporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000C2 /* VskSummaryExporter.swift */; };
+		300000000000000000000111 /* VskilAutoExport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 200000000000000000000111 /* VskilAutoExport.swift */; };
 		3000000000000000000000E1 /* SubscriptionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000E1 /* SubscriptionStore.swift */; };
 		3000000000000000000000E2 /* PaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000E2 /* PaywallView.swift */; };
 		3000000000000000000000BA /* CustomerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000BA /* CustomerDetailView.swift */; };
@@ -64,6 +65,8 @@
 		3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000B5 /* IcelandicTemplate.swift */; };
 		3000000000000000000000F2 /* UniversalTemplate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2000000000000000000000F2 /* UniversalTemplate.swift */; };
 		DEE1F1C5BF8D47E281726E3D70EC727B /* InvoiceQRCode.swift in Sources */ = {isa = PBXBuildFile; fileRef = F31808B6D56743B1A18B0692E11867F3 /* InvoiceQRCode.swift */; };
+		30000000000000000000F1A1 /* FelagAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20000000000000000000F1A1 /* FelagAgent.swift */; };
+		30000000000000000000F1A2 /* FyrirtaekiKit in Frameworks */ = {isa = PBXBuildFile; productRef = 40000000000000000000F1A3 /* FyrirtaekiKit */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -90,6 +93,7 @@
 		2000000000000000000000B6 /* UBLInvoiceExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UBLInvoiceExporter.swift; sourceTree = "<group>"; };
 		2000000000000000000000BC /* BatchExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchExporter.swift; sourceTree = "<group>"; };
 		2000000000000000000000C2 /* VskSummaryExporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VskSummaryExporter.swift; sourceTree = "<group>"; };
+		200000000000000000000111 /* VskilAutoExport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VskilAutoExport.swift; sourceTree = "<group>"; };
 		2000000000000000000000E1 /* SubscriptionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubscriptionStore.swift; sourceTree = "<group>"; };
 		2000000000000000000000E2 /* PaywallView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PaywallView.swift; sourceTree = "<group>"; };
 		2000000000000000000000BA /* CustomerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomerDetailView.swift; sourceTree = "<group>"; };
@@ -126,6 +130,7 @@
 		2000000000000000000000B5 /* IcelandicTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IcelandicTemplate.swift; sourceTree = "<group>"; };
 		2000000000000000000000F2 /* UniversalTemplate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalTemplate.swift; sourceTree = "<group>"; };
 		F31808B6D56743B1A18B0692E11867F3 /* InvoiceQRCode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceQRCode.swift; sourceTree = "<group>"; };
+		20000000000000000000F1A1 /* FelagAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FelagAgent.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -133,6 +138,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				30000000000000000000F1A2 /* FyrirtaekiKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -189,6 +195,7 @@
 				2000000000000000000000E9 /* XLSXReader.swift */,
 				2000000000000000000000EA /* CustomerImport.swift */,
 				2000000000000000000000F3 /* BlizzImporter.swift */,
+				20000000000000000000F1A1 /* FelagAgent.swift */,
 				1000000000000000000000D5 /* Models */,
 				1000000000000000000000D6 /* Views */,
 				1000000000000000000000D7 /* Templates */,
@@ -287,6 +294,7 @@
 				2000000000000000000000B6 /* UBLInvoiceExporter.swift */,
 				2000000000000000000000BC /* BatchExporter.swift */,
 				2000000000000000000000C2 /* VskSummaryExporter.swift */,
+				200000000000000000000111 /* VskilAutoExport.swift */,
 			);
 			path = Export;
 			sourceTree = "<group>";
@@ -316,6 +324,9 @@
 			dependencies = (
 			);
 			name = RUKK;
+			packageProductDependencies = (
+				40000000000000000000F1A3 /* FyrirtaekiKit */,
+			);
 			productName = RUKK;
 			productReference = 2000000000000000000000B3 /* RUKK.app */;
 			productType = "com.apple.product-type.application";
@@ -345,6 +356,9 @@
 				Base,
 			);
 			mainGroup = 1000000000000000000000D0;
+			packageReferences = (
+				40000000000000000000F1A4 /* FyrirtaekiKit */,
+			);
 			productRefGroup = 1000000000000000000000D1 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -373,6 +387,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3000000000000000000000A1 /* RUKKApp.swift in Sources */,
+				30000000000000000000F1A1 /* FelagAgent.swift in Sources */,
 				3000000000000000000000F1 /* Localization.swift in Sources */,
 				30000000000000000000A0FA /* Appearance.swift in Sources */,
 				3000000000000000000000B7 /* FocusedActions.swift in Sources */,
@@ -398,6 +413,7 @@
 				3000000000000000000000B6 /* UBLInvoiceExporter.swift in Sources */,
 				3000000000000000000000BC /* BatchExporter.swift in Sources */,
 				3000000000000000000000C2 /* VskSummaryExporter.swift in Sources */,
+				300000000000000000000111 /* VskilAutoExport.swift in Sources */,
 				3000000000000000000000BA /* CustomerDetailView.swift in Sources */,
 				3000000000000000000000BB /* DashboardView.swift in Sources */,
 				3000000000000000000000B5 /* IcelandicTemplate.swift in Sources */,
@@ -611,6 +627,20 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+/* Begin XCLocalSwiftPackageReference section */
+		40000000000000000000F1A4 /* FyrirtaekiKit */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "../../FELAG/FyrirtaekiKit";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		40000000000000000000F1A3 /* FyrirtaekiKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 40000000000000000000F1A4 /* FyrirtaekiKit */;
+			productName = FyrirtaekiKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 1000000000000000000000E1 /* Project object */;
 }

@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import AppKit
 import UniformTypeIdentifiers
+import FyrirtaekiKit
 import os
 
 private let settingsLog = Logger(subsystem: "is.calmail.kula", category: "settings")
@@ -107,8 +108,57 @@ private struct SettingsTabs: View {
 
             MailWatchTab()
                 .tabItem { Label("Póstvakt", systemImage: "envelope.badge") }
+
+            VskilTab()
+                .tabItem { Label("VSKIL", systemImage: "arrow.right.doc.on.clipboard") }
         }
         .padding()
+    }
+}
+
+// MARK: - VSKIL (sjálfvirkur flutningur við yfirferð)
+
+/// Stillingar sjálfvirks VSKIL-flutnings: þegar kostnaðarfærslu er hakað
+/// „Búið að yfirfara" er VSK-yfirlitið fyrir tímabilið skrifað í VSKIL-möppuna.
+private struct VskilTab: View {
+    @State private var folder: URL? = VskilAutoExport.folderURL
+    @State private var enabled: Bool = VskilAutoExport.isEnabled
+
+    var body: some View {
+        Form {
+            Section("Sjálfvirkur flutningur") {
+                Toggle("Senda í VSKIL þegar færslu er yfirfarið", isOn: Binding(
+                    get: { enabled },
+                    set: { enabled = $0; VskilAutoExport.isEnabled = $0 }))
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("VSKIL-mappa")
+                        Text(folder?.path ?? String(localized: "Engin mappa valin"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.middle)
+                    }
+                    Spacer()
+                    Button("Velja möppu…") {
+                        if let url = VskilAutoExport.chooseFolder() {
+                            folder = url
+                            enabled = true
+                        }
+                    }
+                }
+            }
+            Section {
+                Text("Þegar þú hakkar „Búið að yfirfara“ á kostnaðarfærslu endurreiknar RUKK VSK-yfirlitið fyrir tímabilið og skrifar það í VSKIL-möppuna. VSKIL les skrána („Hlaupa úr RUKK…“) með nýjustu stöðunni. Aðeins yfirfarðar færslur fara með.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .formStyle(.grouped)
+        .onAppear {
+            folder = VskilAutoExport.folderURL
+            enabled = VskilAutoExport.isEnabled
+        }
     }
 }
 
@@ -196,33 +246,106 @@ private struct MailWatchTab: View {
 
 private struct ProfileTab: View {
     @Bindable var settings: AppSettings
+    @Environment(FelagAgent.self) private var felag
+
+    /// True þegar þessi færsla fylgir FELAG-fyrirtæki — þá eru auðkenni,
+    /// samskipti og merki stjórnað í FELAG (samstillt hingað eftir kennitölu).
+    private var fráFelag: Bool { felag.felagFyrirtæki(fyrir: settings) != nil }
 
     var body: some View {
         Form {
             Section("Merki") {
-                LogoPicker(data: $settings.logoData)
+                if fráFelag {
+                    HStack(spacing: 12) {
+                        FelagLogoSýn(data: settings.logoData)
+                        Text("Merkið er stjórnað í FELAG.")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                } else {
+                    LogoPicker(data: $settings.logoData)
+                }
                 Slider(value: $settings.logoScale, in: 0.5...3.0, step: 0.05) {
                     Text("Stærð")
                 } minimumValueLabel: { Text("50%") } maximumValueLabel: { Text("300%") }
                 LabeledContent("Skali", value: "\(Int(settings.logoScale * 100))%")
             }
             Section("Auðkenni") {
-                TextField("Fullt nafn", text: $settings.fullName)
-                TextField("Fyrirtæki", text: $settings.companyName)
-                TextField("Kennitala", text: $settings.companyNationalID)
-                TextField("VSK-númer", text: $settings.companyVATNumber)
-                TextField("Bankareikningur (Reikningsnr.)", text: $settings.bankAccountNumber)
+                if fráFelag {
+                    LabeledContent("Fyrirtæki", value: settings.companyName.isEmpty ? "—" : settings.companyName)
+                    LabeledContent("Kennitala",
+                                   value: Kennitala(settings.companyNationalID)?.formatted
+                                        ?? (settings.companyNationalID.isEmpty ? "—" : settings.companyNationalID))
+                    LabeledContent("VSK-númer", value: settings.companyVATNumber.isEmpty ? "—" : settings.companyVATNumber)
+                    LabeledContent("Bankareikningur",
+                                   value: settings.bankAccountNumber.isEmpty ? "—" : settings.bankAccountNumber)
+                    Text("Stjórnað í FELAG — auðkenni, heimilisfang, samskipti og merki eru breytt þar og samstillt hingað.")
+                        .font(.caption).foregroundStyle(.secondary)
+                } else {
+                    TextField("Fullt nafn", text: $settings.fullName)
+                    TextField("Fyrirtæki", text: $settings.companyName)
+                    TextField("Kennitala", text: $settings.companyNationalID)
+                    TextField("VSK-númer", text: $settings.companyVATNumber)
+                    TextField("Bankareikningur (Reikningsnr.)", text: $settings.bankAccountNumber)
+                }
                 TextField("Innh.máti (sjálfgefið)", text: $settings.collectionMethod)
             }
             Section("Hafa samband") {
-                TextField("Netfang", text: $settings.companyEmail)
-                TextField("Sími", text: $settings.companyPhone)
-                TextField("Vefsíða", text: $settings.companyWebsite)
-                TextField("Heimilisfang", text: $settings.companyAddress, axis: .vertical)
-                    .lineLimit(2...5)
+                if fráFelag {
+                    LabeledContent("Netfang", value: settings.companyEmail.isEmpty ? "—" : settings.companyEmail)
+                    LabeledContent("Sími", value: settings.companyPhone.isEmpty ? "—" : settings.companyPhone)
+                    LabeledContent("Vefsíða", value: settings.companyWebsite.isEmpty ? "—" : settings.companyWebsite)
+                    LabeledContent("Heimilisfang", value: settings.companyAddress.isEmpty ? "—" : settings.companyAddress)
+                } else {
+                    TextField("Netfang", text: $settings.companyEmail)
+                    TextField("Sími", text: $settings.companyPhone)
+                    TextField("Vefsíða", text: $settings.companyWebsite)
+                    TextField("Heimilisfang", text: $settings.companyAddress, axis: .vertical)
+                        .lineLimit(2...5)
+                }
+            }
+            Section("FELAG") {
+                if felag.tengt {
+                    Label("Tengt við FELAG — auðkenni og merki samstillt úr companies.xml.",
+                          systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                    Button("Aftengja FELAG…") { felag.aftengja() }
+                        .font(.caption)
+                } else {
+                    Text("FELAG geymir sameiginlegu fyrirtækjagögnin (nafn, kennitala, VSK-númer, heimilisfang, banki, merki) sem VSKIL, RUKK, BLIZZ og LAUNA deila.")
+                        .font(.caption).foregroundStyle(.secondary)
+                    Button("Tengjast FELAG…") { felag.veljaMöppu() }
+                }
             }
         }
         .formStyle(.grouped)
+    }
+}
+
+/// Óbreytanleg sýn á merki (FELAG-ham) — sami rammi og LogoPicker.
+private struct FelagLogoSýn: View {
+    let data: Data?
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        Group {
+            if let data, let img = NSImage(data: data) {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+            } else {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(Color.secondary.opacity(0.1))
+                    Image(systemName: "photo")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .frame(width: 80, height: 80)
+        .background(data != nil && colorScheme == .dark ? Color.white.opacity(0.92) : .clear,
+                    in: RoundedRectangle(cornerRadius: 6))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
