@@ -16,6 +16,8 @@ struct ContentView: View {
     /// Bein tenging við Bill To Book — nil ef þjónustan er ekki í umhverfinu (forsýn).
     @Environment(RukkLinkService.self) private var link: RukkLinkService?
     @Environment(ExpenseMailWatcher.self) private var mailWatcher: ExpenseMailWatcher?
+    /// Tenging við FELAG — sameiginleg fyrirtækjaskráin (companies.xml).
+    @Environment(FelagAgent.self) private var felag
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
     @AppStorage("kulaNormalizedV1") private var didNormalize = false
@@ -67,6 +69,8 @@ struct ContentView: View {
     var body: some View {
         splitView
         .task {
+            // Samstilla fyrirtækjaskrána við FELAG áður en virkt fyrirtæki er valið.
+            felag.samræma(context: context)
             // Tryggja að a.m.k. eitt fyrirtæki sé til og að virkt fyrirtæki sé valið.
             let company = AppSettings.active(in: context, activeID: activeCompanyID)
             if activeCompanyID.isEmpty { activeCompanyID = company.id.uuidString }
@@ -82,6 +86,11 @@ struct ContentView: View {
                 AppSettings.active(in: context,
                                    activeID: UserDefaults.standard.string(forKey: "activeCompanyID") ?? "")
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            // FELAG hefur kannski breytt companies.xml meðan forritið beið.
+            felag.endurhlaða()
+            felag.samræma(context: context)
         }
         .onChange(of: link?.latestExpense) { _, expense in
             // Kvittun barst beint úr símanum — færa valið á nýju færsluna.
@@ -433,51 +442,78 @@ struct ContentView: View {
 
 // MARK: - VSK-yfirlit fyrir VSKIL
 
-/// Spjald sem lætur notanda velja ár og tveggja mánaða tímabil og flytur út
-/// VSK-yfirlit (JSON) sem VSKIL les inn í virðisaukaskattsskýrsluna.
-/// Upphæðir koma úr útgefnum reikningum (bókunardegi rænt) og kostnaði —
-/// sjá `VskSummaryExporter`.
+/// Spjald með lista yfir öll VSK-tímabil (nýjustu efst) — hvert tímabil
+/// fyrir sig, líka gömlu — með yfirlits-tölum fyrir sölu og innkaup.
+/// Valið tímabil er flutt út sem `_vskil-<kt>-<ár>-<tímabil>.json`
+/// (VSKIL les það inn í virðisaukaskattsskýrsluna). Sjá `VskSummaryExporter`.
 private struct VskExportView: View {
     let company: AppSettings
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
-    @State private var ar: Int
-    @State private var timabilNr: Int
+    /// Eitt tveggja mánaða tímabil á tilteknu ári.
+    struct TimabilStak: Identifiable, Hashable {
+        let ar: Int
+        let timabilNr: Int
+        var id: String { "\(ar)-\(timabilNr)" }
+    }
+
+    @State private var timabilin: [TimabilStak] = []
+    @State private var val: TimabilStak?
+    @State private var invoices: [Invoice] = []
+    @State private var expenses: [Expense] = []
     @State private var synaStodu = false
     @State private var villa: String?
 
-    /// Sjálfgefið val: tímabilið sem í dagurinn fellur í.
-    init(company: AppSettings) {
-        self.company = company
-        let kal = Calendar.current
-        let nu = Date()
-        _ar = State(initialValue: kal.component(.year, from: nu))
-        _timabilNr = State(initialValue: (kal.component(.month, from: nu) + 1) / 2)
-    }
+    /// Yfirlit yfir valið tímabil (reiknað þegar val breytist).
+    @State private var payload: VskYfirlitPayload?
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("VSK-yfirlit fyrir VSKIL")
+        VStack(spacing: 12) {
+            Text("VSK-yfirlit fyrir VSKIL — \(company.displayName)")
                 .font(.headline)
-            Text("\(company.displayName) — \(VskSummaryExporter.timabilHeiti(timabilNr: timabilNr)) \(ar) (tímabil \(VskSummaryExporter.rskNumer(timabilNr: timabilNr)))")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
 
-            Form {
-                Picker("Ár", selection: $ar) {
-                    ForEach((ar - 3)...(ar + 1), id: \.self) { a in
-                        Text(String(a)).tag(a)
+            HStack(spacing: 0) {
+                // Tímabilin — öll frá fyrsta gögna-ári til nú, nýjustu efst.
+                List(timabilin, selection: $val) { t in
+                    timabilRow(t)
+                        .tag(t)
+                }
+                .frame(minWidth: 230)
+
+                Divider()
+
+                // Nánarsýn valins tímabils.
+                VStack(alignment: .leading, spacing: 10) {
+                    if let val, let payload {
+                        Text("\(VskSummaryExporter.timabilHeiti(timabilNr: val.timabilNr)) \(String(val.ar))")
+                            .font(.title3.weight(.semibold))
+                        Text("Tímabil \(VskSummaryExporter.rskNumer(timabilNr: val.timabilNr)) hjá Skattinum · \(payload.dagsFra) – \(payload.dagsTil)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Divider()
+                        LabeledContent("Reikningar (sala)", value: "\(payload.sala.count)")
+                        LabeledContent("Útskattur 24%", value: kr(payload.samtala.utskattur24))
+                        LabeledContent("Útskattur 11%", value: kr(payload.samtala.utskattur11))
+                        Divider()
+                        LabeledContent("Kostnaður (innkaup)", value: "\(payload.innkaup.count)")
+                        LabeledContent("Innskattur 24%", value: kr(payload.samtala.innskattur24))
+                        LabeledContent("Innskattur 11%", value: kr(payload.samtala.innskattur11))
+                        Divider()
+                        let adgreining = payload.samtala.utskattur24 + payload.samtala.utskattur11
+                                       - payload.samtala.innskattur24 - payload.samtala.innskattur11
+                        LabeledContent("Aðgreining", value: kr(adgreining))
+                            .font(.callout.weight(.semibold))
+                        Spacer()
+                    } else {
+                        Text("Veldu tímabil úr listanum.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
                 }
-                Picker("Tímabil", selection: $timabilNr) {
-                    ForEach(1...6, id: \.self) { n in
-                        Text("\(VskSummaryExporter.timabilHeiti(timabilNr: n)) — \(VskSummaryExporter.rskNumer(timabilNr: n))").tag(n)
-                    }
-                }
+                .padding(14)
+                .frame(minWidth: 280)
             }
-            .formStyle(.grouped)
-            .frame(width: 320)
 
             if let villa {
                 Label(villa, systemImage: "exclamationmark.triangle")
@@ -496,22 +532,85 @@ private struct VskExportView: View {
                 Button("Flytja út…") { flytjaUt() }
                     .keyboardShortcut(.defaultAction)
                     .buttonStyle(.borderedProminent)
+                    .disabled(payload == nil)
             }
         }
         .padding(20)
-        .frame(width: 380)
+        .frame(minWidth: 560, minHeight: 420)
+        .task { hlaupa() }
+        .onChange(of: val) { _, _ in reikna() }
     }
 
-    /// Reiknar yfirlit fyrir valið tímabil og býður upp á að vista sem
-    /// `_vskil-<kennitala>-<ár>-<tímabil>.json`.
-    private func flytjaUt() {
+    /// Lína í tímabilslistanum: heiti, RSK-númer og stutt samantekt.
+    private func timabilRow(_ t: TimabilStak) -> some View {
+        let bil = VskSummaryExporter.timabilBil(ar: t.ar, timabilNr: t.timabilNr, kal: .current)
+        let fjoldiReikninga = invoices.filter {
+            $0.isIssued && !$0.isEstimate && $0.currencyCode == "ISK"
+                && $0.issuer?.id == company.id
+                && bil.contains($0.bookingDate ?? $0.issueDate)
+        }.count
+        let fjoldiFaerslna = expenses.filter {
+            $0.currencyCode == "ISK" && $0.company?.id == company.id
+                && bil.contains($0.date) && $0.amount != 0
+        }.count
+        return HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(VskSummaryExporter.timabilHeiti(timabilNr: t.timabilNr)) \(String(t.ar))")
+                    .font(.callout.weight(.medium))
+                Text("Tímabil \(VskSummaryExporter.rskNumer(timabilNr: t.timabilNr))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if fjoldiReikninga + fjoldiFaerslna > 0 {
+                Text("\(fjoldiReikninga) r. · \(fjoldiFaerslna) f.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    /// Hleður gögnum og byggir tímabilslistann: frá fyrsta ári með gögn
+    /// til núverandi árs. Sjálfgefið val: tímabilið sem í dagurinn fellur í.
+    private func hlaupa() {
+        invoices = (try? context.fetch(FetchDescriptor<Invoice>())) ?? []
+            .filter { $0.issuer?.id == company.id }
+        expenses = (try? context.fetch(FetchDescriptor<Expense>())) ?? []
+            .filter { $0.company?.id == company.id }
+
+        let kal = Calendar.current
+        let nu = Date()
+        let arNu = kal.component(.year, from: nu)
+        let elsta = ([arNu] + invoices.map { kal.component(.year, from: $0.bookingDate ?? $0.issueDate) }
+                               + expenses.map { kal.component(.year, from: $0.date) }).min() ?? arNu
+        var list: [TimabilStak] = []
+        for a in elsta...arNu {
+            for n in 1...6 { list.append(TimabilStak(ar: a, timabilNr: n)) }
+        }
+        timabilin = list.reversed()
+        val = TimabilStak(ar: arNu, timabilNr: (kal.component(.month, from: nu) + 1) / 2)
+        reikna()
+    }
+
+    /// Reiknar yfirlitið fyrir valið tímabil.
+    private func reikna() {
+        guard let val else { payload = nil; return }
+        payload = VskSummaryExporter.payload(invoices: invoices, expenses: expenses,
+                                             company: company, ar: val.ar,
+                                             timabilNr: val.timabilNr, kal: .current)
+        synaStodu = false
         villa = nil
-        let invoices = (try? context.fetch(FetchDescriptor<Invoice>())) ?? []
-        let expenses = (try? context.fetch(FetchDescriptor<Expense>())) ?? []
-        let payload = VskSummaryExporter.payload(invoices: invoices, expenses: expenses,
-                                                 company: company,
-                                                 ar: ar, timabilNr: timabilNr,
-                                                 kal: .current)
+    }
+
+    private func kr(_ d: Decimal) -> String {
+        Money.format(d, currencyCode: "ISK")
+    }
+
+    /// Skrifar yfirlit valins tímabils sem `_vskil-<kt>-<ár>-<tímabil>.json`.
+    private func flytjaUt() {
+        guard let val, let payload else { return }
+        villa = nil
         let gogn: Data
         do {
             gogn = try VskSummaryExporter.gogn(payload)
@@ -522,7 +621,7 @@ private struct VskExportView: View {
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]
-        panel.nameFieldStringValue = "_vskil-\(company.companyNationalID)-\(ar)-\(VskSummaryExporter.rskNumer(timabilNr: timabilNr)).json"
+        panel.nameFieldStringValue = "_vskil-\(company.companyNationalID)-\(val.ar)-\(VskSummaryExporter.rskNumer(timabilNr: val.timabilNr)).json"
         panel.message = String(localized: "Veldu hvar VSK-yfirlitið skal vera vistað")
         guard panel.runModal() == .OK, let url = panel.url else { return }
         do {
