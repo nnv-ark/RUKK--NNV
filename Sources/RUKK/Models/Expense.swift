@@ -18,6 +18,14 @@ final class Expense {
     var category: String = ""               // bókhaldsflokkur (frjáls texti)
     var amount: Decimal = 0                 // heildarupphæð með VSK
     var taxRate: Decimal = 24               // VSK-hlutfall (0 / 11 / 24)
+    /// Sundurliðun eftir VSK-þrepum: hluti upphæðar (með VSK) í hvoru þrepi.
+    /// Notað þegar kvittun spannar fleiri en eitt þrep — t.d. Rafha-kvittun
+    /// með kaffi @ 11% (1.590) og grilli @ 24% (9.950). `isVatSplit` ræður
+    /// hvort sundurliðunin gildir í stað eins hlutfalls fyrir allt.
+    var isVatSplit: Bool = false
+    var splitGross24: Decimal = 0
+    var splitGross11: Decimal = 0
+    var splitGross0: Decimal = 0
     var currencyCode: String = "ISK"
     var note: String = ""
     /// Hakað við þegar færslan hefur verið yfirfarin (t.d. stemmd við kvittun).
@@ -47,13 +55,29 @@ final class Expense {
     /// VSK = upphæð − nettó. Þannig stemmir talan við „Þar af VSK" á kvittuninni
     /// (t.d. 5.000 kr. @ 11 % → nettó 4.505, VSK 495 — ekki 496 eins og beinn
     /// útreikningur 5.000 × 11/111 = 495,495… gæfi eftir tvöfalda námundun).
+    /// Við sundurliðun er VSK summan af VSK hvers þreps fyrir sig.
     var vatAmount: Decimal {
+        if isVatSplit {
+            return vatPart(gross: splitGross24, rate: 24)
+                 + vatPart(gross: splitGross11, rate: 11)
+        }
         guard taxRate > 0 else { return 0 }
+        return vatPart(gross: amount, rate: taxRate)
+    }
+
+    /// Nettóhluti upphæðar í tilteknu þrepi (námundaður eins og á kvittun).
+    func netPart(gross: Decimal, rate: Decimal) -> Decimal {
         let scale = currencyCode == "ISK" ? 0 : 2
-        var input = amount / (1 + taxRate / 100)
+        var input = gross / (1 + rate / 100)
         var net = Decimal()
         NSDecimalRound(&net, &input, scale, .plain)
-        return amount - net
+        return net
+    }
+
+    /// VSK-hluti upphæðar í tilteknu þrepi: gross − námundað nettó.
+    func vatPart(gross: Decimal, rate: Decimal) -> Decimal {
+        guard rate > 0, gross != 0 else { return 0 }
+        return gross - netPart(gross: gross, rate: rate)
     }
 
     /// Upphæð án VSK.

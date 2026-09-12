@@ -80,6 +80,33 @@ final class ExpenseTests: XCTestCase {
         XCTAssertTrue(expense.reviewed)
     }
 
+    /// Sundurliðuð færsla — Rafha-kvittun: kaffi 1.590 @ 11% (nettó 1.432,
+    /// VSK 158) og grill 9.950 @ 24% (nettó 8.024, VSK 1.926). Samtals 11.540.
+    func testVatSplitMatchesReceiptBreakdown() throws {
+        let expense = Expense(amount: 11_540)
+        expense.isVatSplit = true
+        expense.splitGross11 = 1_590
+        expense.splitGross24 = 9_950
+
+        XCTAssertEqual(expense.vatPart(gross: 1_590, rate: 11), 158)
+        XCTAssertEqual(expense.netPart(gross: 1_590, rate: 11), 1_432)
+        XCTAssertEqual(expense.vatPart(gross: 9_950, rate: 24), 1_926)
+        XCTAssertEqual(expense.netPart(gross: 9_950, rate: 24), 8_024)
+        XCTAssertEqual(expense.vatAmount, 158 + 1_926)   // 2.084 — summa þrepa
+        XCTAssertEqual(expense.netAmount, 11_540 - 2_084)
+    }
+
+    /// Án sundurliðunar hegðar færslan sér eins og áður (eitt hlutfall)
+    /// og þrepasviðin eru hunsuð.
+    func testVatSplitOffUsesSingleRate() throws {
+        let expense = Expense(amount: 11_540)
+        expense.taxRate = 24
+        expense.splitGross24 = 9_950   // hunsuð þegar isVatSplit er false
+        // 11.540 / 1,24 = 9.306,45… → nettó 9.306, VSK 2.234
+        XCTAssertEqual(expense.vatAmount, 2_234)
+        XCTAssertEqual(expense.netAmount, 9_306)
+    }
+
     func testMakeNextUsesCompanyDefaults() throws {
         let context = try makeContext()
         let company = AppSettings()

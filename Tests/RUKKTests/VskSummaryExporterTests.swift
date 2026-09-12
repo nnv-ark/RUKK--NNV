@@ -200,6 +200,30 @@ final class VskSummaryExporterTests: XCTestCase {
         XCTAssertFalse(p.innkaup.contains { $0.lysing.contains("50.000") })
     }
 
+    /// Sundurliðuð færsla (Rafha-dæmið: 1.590 @ 11% + 9.950 @ 24%) verður
+    /// ein lína á þrep í innkaupum — samsvarandi sundurliðuninni á kvittuninni.
+    func testSundurliðudFaerslaVerdurEinLinaAThrep() throws {
+        let context = try makeContext()
+        let fyrirtaeki = company(context)
+        let e = kostnadur(context, fyrirtaeki: fyrirtaeki, dagur: "2026-03-10",
+                          amount: 11_540, taxRate: 24)
+        e.isVatSplit = true
+        e.splitGross11 = 1_590
+        e.splitGross24 = 9_950
+
+        let expenses = try context.fetch(FetchDescriptor<Expense>())
+        let p = VskSummaryExporter.payload(invoices: [], expenses: expenses,
+                                           company: fyrirtaeki,
+                                           ar: 2026, timabilNr: 2, kal: kal)
+        XCTAssertEqual(p.innkaup.count, 2)
+        let l11 = try XCTUnwrap(p.innkaup.first { $0.threp == 11 })
+        let l24 = try XCTUnwrap(p.innkaup.first { $0.threp == 24 })
+        XCTAssertEqual(l11.netto, 1_432); XCTAssertEqual(l11.vsk, 158)
+        XCTAssertEqual(l24.netto, 8_024); XCTAssertEqual(l24.vsk, 1_926)
+        XCTAssertEqual(p.samtala.innskattur11, 158)
+        XCTAssertEqual(p.samtala.innskattur24, 1_926)
+    }
+
     /// VSKIL sannreinir samtölur gegn færslunum — þess vegna verður gagn
     /// sem við smíðum hér að standast þá prófun.
     func testGognStandastVskilSannreiningu() throws {

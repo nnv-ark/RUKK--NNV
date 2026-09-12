@@ -144,6 +144,10 @@ struct ExpenseListView: View {
         copy.note = src.note
         copy.receiptData = src.receiptData
         copy.source = src.source
+        copy.isVatSplit = src.isVatSplit
+        copy.splitGross24 = src.splitGross24
+        copy.splitGross11 = src.splitGross11
+        copy.splitGross0 = src.splitGross0
         context.insert(copy)
         selection = copy
     }

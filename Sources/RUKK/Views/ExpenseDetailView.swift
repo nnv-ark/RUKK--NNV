@@ -41,12 +41,28 @@ struct ExpenseDetailView: View {
 
             Section("Upphæð") {
                 TextField("Upphæð með VSK", value: $expense.amount, format: .number)
-                Picker("VSK", selection: $expense.taxRate) {
-                    Text("24 %").tag(Decimal(24))
-                    Text("11 %").tag(Decimal(11))
-                    Text("0 %").tag(Decimal(0))
+                Toggle("Sundurliða eftir VSK-þrepum", isOn: splitBinding)
+                if expense.isVatSplit {
+                    TextField("Hluti með 24 % VSK", value: $expense.splitGross24, format: .number)
+                    TextField("Hluti með 11 % VSK", value: $expense.splitGross11, format: .number)
+                    TextField("Hluti án VSK", value: $expense.splitGross0, format: .number)
+                    if splitRemainder != 0 {
+                        HStack {
+                            Text("Óúthlutað")
+                            Spacer()
+                            Text(Money.format(splitRemainder, currencyCode: expense.currencyCode))
+                                .monospacedDigit()
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                } else {
+                    Picker("VSK", selection: $expense.taxRate) {
+                        Text("24 %").tag(Decimal(24))
+                        Text("11 %").tag(Decimal(11))
+                        Text("0 %").tag(Decimal(0))
+                    }
+                    .pickerStyle(.segmented)
                 }
-                .pickerStyle(.segmented)
                 HStack {
                     Text("Þar af VSK")
                     Spacer()
@@ -71,6 +87,31 @@ struct ExpenseDetailView: View {
         }
         .formStyle(.grouped)
         .frame(minWidth: 420)
+    }
+
+    // MARK: - VSK-sundurliðun
+
+    /// Hakk sem virkjar sundurliðun — fyllir þrepið sem samsvarar núverandi
+    /// hlutfalli með allri upphæðinni svo summa þrepanna stemmi frá byrjun.
+    private var splitBinding: Binding<Bool> {
+        Binding(
+            get: { expense.isVatSplit },
+            set: { on in
+                expense.isVatSplit = on
+                if on, expense.splitGross24 + expense.splitGross11 + expense.splitGross0 == 0 {
+                    switch expense.taxRate {
+                    case 11: expense.splitGross11 = expense.amount
+                    case 0:  expense.splitGross0 = expense.amount
+                    default: expense.splitGross24 = expense.amount
+                    }
+                }
+            }
+        )
+    }
+
+    /// Upphæð sem er ekki úthlutuð á þrep — á að vera 0 þegar sundurliðun er tilbúin.
+    private var splitRemainder: Decimal {
+        expense.amount - expense.splitGross24 - expense.splitGross11 - expense.splitGross0
     }
 
     // MARK: - Kvittunarmynd

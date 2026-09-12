@@ -115,9 +115,29 @@ enum VskSummaryExporter {
             }
             .sorted { $0.date < $1.date }
 
-        let innkaup: [VskYfirlitPayload.Skjal] = kostnadur.map {
-            .init(lysing: "\($0.vendor): \($0.expenseDescription) — \(dagur.string(from: $0.date))",
-                  threp: threpTala($0.taxRate), netto: $0.netAmount, vsk: $0.vatAmount)
+        // Sundurliðuð færsla verður ein lína á VSK-þrep (sama sundurliðun og
+        // prentast neðst á kvittuninni: „VSK 11% 1.432 158", „VSK 24% 8.024 1.926").
+        let innkaup: [VskYfirlitPayload.Skjal] = kostnadur.flatMap { e -> [VskYfirlitPayload.Skjal] in
+            let lysing = "\(e.vendor): \(e.expenseDescription) — \(dagur.string(from: e.date))"
+            guard e.isVatSplit else {
+                return [.init(lysing: lysing, threp: threpTala(e.taxRate),
+                              netto: e.netAmount, vsk: e.vatAmount)]
+            }
+            var rows: [VskYfirlitPayload.Skjal] = []
+            if e.splitGross24 != 0 {
+                rows.append(.init(lysing: lysing, threp: 24,
+                                  netto: e.netPart(gross: e.splitGross24, rate: 24),
+                                  vsk: e.vatPart(gross: e.splitGross24, rate: 24)))
+            }
+            if e.splitGross11 != 0 {
+                rows.append(.init(lysing: lysing, threp: 11,
+                                  netto: e.netPart(gross: e.splitGross11, rate: 11),
+                                  vsk: e.vatPart(gross: e.splitGross11, rate: 11)))
+            }
+            if e.splitGross0 != 0 {
+                rows.append(.init(lysing: lysing, threp: 0, netto: e.splitGross0, vsk: 0))
+            }
+            return rows
         }
 
         return VskYfirlitPayload(
