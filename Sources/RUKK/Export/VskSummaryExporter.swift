@@ -106,10 +106,12 @@ enum VskSummaryExporter {
         }
 
         // Kostnaður á tímabilinu — VSK upphæðin færð sem innskattur.
+        // Aðeins kostnaður sem merktur er sem yfirfarinn fer með: VSKIL tekur
+        // þá sjálfkrafa inn það sem hefur verið yfirfarið í RUKK.
         let kostnadur = expenses
             .filter {
                 $0.currencyCode == "ISK" && $0.company?.id == company.id
-                    && bil.contains($0.date) && $0.amount != 0
+                    && bil.contains($0.date) && $0.amount != 0 && $0.reviewed
             }
             .sorted { $0.date < $1.date }
 

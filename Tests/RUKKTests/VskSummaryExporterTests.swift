@@ -52,7 +52,8 @@ final class VskSummaryExporterTests: XCTestCase {
     }
 
     private func kostnadur(_ context: ModelContext, fyrirtaeki: AppSettings,
-                           dagur: String, amount: Decimal = 124_000, taxRate: Decimal = 24) -> Expense {
+                           dagur: String, amount: Decimal = 124_000, taxRate: Decimal = 24,
+                           yfirfarinn: Bool = true) -> Expense {
         let e = Expense()
         e.company = fyrirtaeki
         e.vendor = "Seljandi ehf."
@@ -60,6 +61,7 @@ final class VskSummaryExporterTests: XCTestCase {
         e.date = date(dagur)
         e.amount = amount
         e.taxRate = taxRate
+        e.reviewed = yfirfarinn
         context.insert(e)
         return e
     }
@@ -177,6 +179,25 @@ final class VskSummaryExporterTests: XCTestCase {
         XCTAssertEqual(p.samtala.innskattur24, 24_000)
         XCTAssertEqual(p.samtala.innskattur11, 5_500)
         XCTAssertEqual(p.innkaup.count, 2)
+    }
+
+    /// Aðeins kostnaður sem merktur er sem yfirfarinn fer með í yfirlitið —
+    /// VSKIL tekur þá sjálfkrafa inn það sem hefur verið yfirfarið í RUKK.
+    func testAdeinsYfirfarinnKostnadurFerMed() throws {
+        let context = try makeContext()
+        let fyrirtaeki = company(context)
+        kostnadur(context, fyrirtaeki: fyrirtaeki, dagur: "2026-03-10",
+                  amount: 124_000, taxRate: 24, yfirfarinn: true)
+        kostnadur(context, fyrirtaeki: fyrirtaeki, dagur: "2026-03-15",
+                  amount: 50_000, taxRate: 24, yfirfarinn: false)
+
+        let expenses = try context.fetch(FetchDescriptor<Expense>())
+        let p = VskSummaryExporter.payload(invoices: [], expenses: expenses,
+                                           company: fyrirtaeki,
+                                           ar: 2026, timabilNr: 2, kal: kal)
+        XCTAssertEqual(p.innkaup.count, 1)
+        XCTAssertEqual(p.samtala.innskattur24, 24_000)
+        XCTAssertFalse(p.innkaup.contains { $0.lysing.contains("50.000") })
     }
 
     /// VSKIL sannreinir samtölur gegn færslunum — þess vegna verður gagn

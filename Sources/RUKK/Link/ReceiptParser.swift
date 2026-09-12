@@ -23,7 +23,7 @@ enum ReceiptParser {
             date: guessDate(clean),
             total: guessTotal(clean),
             vat: guessVat(clean),
-            vatRate: nil
+            vatRate: guessVatRate(clean)
         ).withInferredRate()
     }
 
@@ -56,31 +56,66 @@ enum ReceiptParser {
         return Decimal(string: s)
     }
 
-    /// Allar upphæðir sem koma fram í textalínu. Kennitalur (123456-7890 eða
-    /// 10 tölur í röð) eru hunsunar — þær eru næstan alltaf stærsta talan á
-    /// kvittuninni og myndu annars verða fyrir „stærstu tölunnar" varafallinu.
+    /// Allar upphæðir sem koma fram í textalínu. Kennitalur, dagsetningar,
+    /// tímar, prósentur og ártöl eru hunsuð — þær eru annars stærstu tölurnar
+    /// á kvittuninni (kt./ár drap varafallið áður) og eru aldrei upphæðir.
     private static func amounts(in line: String) -> [Decimal] {
-        let withoutKt = line.replacingOccurrences(
-            of: #"\d{6}\s?-\s?\d{4}|\b\d{10}\b"#,
-            with: " ", options: .regularExpression)
+        var scrubbed = line
+        let noise: [(String, String)] = [
+            // Kennitala: „640198-2029", „640198 2029" eða „6401982029".
+            (#"\b\d{6}\s?-?\s?\d{4}\b"#, " "),
+            // Dagsetning: „11.09.2026", „11/09/26", „2026-09-11".
+            (#"\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b"#, " "),
+            // Tími: „13:42" (á kvittunum með dagsetningunni).
+            (#"\b\d{1,2}:\d{2}(?::\d{2})?\b"#, " "),
+            // Prósent: „24%", „10 %" — hlutfall, ekki upphæð.
+            (#"\d+(?:[.,]\d+)?\s*%"#, " "),
+            // Ártal: „2026" — upphæð á sama bili (1.900–2.099) er á kvittunum
+            // alltaf prentuð með þúsundaskili („2.026"), svo ber 4-stafa tala
+            // í þessum takmörkum er ártal, ekki krónur.
+            (#"\b(?:19|20)\d{2}\b"#, " "),
+        ]
+        for (pattern, _) in noise {
+            scrubbed = scrubbed.replacingOccurrences(of: pattern, with: " ",
+                                                     options: .regularExpression)
+        }
         let pattern = #"\d{1,3}(?:[ .]\d{3})+(?:,\d{1,2})?|\d+(?:[.,]\d{1,2})?"#
         return (try? NSRegularExpression(pattern: pattern))
             .map { re in
-                re.matches(in: withoutKt, range: NSRange(withoutKt.startIndex..., in: withoutKt))
-                    .compactMap { Range($0.range, in: withoutKt) }
-                    .compactMap { parseAmount(String(withoutKt[$0])) }
+                re.matches(in: scrubbed, range: NSRange(scrubbed.startIndex..., in: scrubbed))
+                    .compactMap { Range($0.range, in: scrubbed) }
+                    .compactMap { parseAmount(String(scrubbed[$0])) }
             } ?? []
     }
 
+    /// Upphæðir af línu sem inniheldur EKKI bókstafi — eingöngu tölur,
+    /// skilaregni og gjaldmiðilstengt („1.737 kr."). Vision skilar oft
+    /// dálkum á sér línum („Samtals:" / „1.737 kr.") og þá er þessi
+    /// líkindaathugun notuð til að para lykilorð við upphæð.
+    private static func amountsOnly(in line: String) -> [Decimal] {
+        let withoutCurrency = line.replacingOccurrences(
+            of: #"(?i)\b(?:kr|isk)\.?\b"#, with: " ", options: .regularExpression)
+        guard withoutCurrency.rangeOfCharacter(from: .letters) == nil else { return [] }
+        return amounts(in: withoutCurrency)
+    }
+
     /// Heildarupphæð: lína með lykilorði (samtals/total/til greiðslu …),
-    /// annars stærsta upphæðin á kvittuninni.
+    /// annars stærsta upphæðin á kvittuninni. Lesi Vision upphæðina á sér
+    /// línu (dálkaskipt OCR: „Samtals:" / „1.737 kr.") er lykilorðalínu
+    /// parað við næstu upphæðar-línu á undan eða eftir.
     private static func guessTotal(_ lines: [String]) -> Decimal? {
         let keywords = ["samtals", "total", "til greiðslu", "heild", "alls", "að greiða"]
-        for line in lines.reversed() {   // samtalan er neðst
+        for (i, line) in lines.enumerated().reversed() {   // samtalan er neðst
             let lower = line.lowercased()
-            if keywords.contains(where: lower.contains),
-               let amount = amounts(in: line).max() {
+            guard keywords.contains(where: lower.contains) else { continue }
+            if let amount = amounts(in: line).max() {
                 return amount
+            }
+            for j in (i + 1)..<lines.count {
+                if let amount = amountsOnly(in: lines[j]).max() { return amount }
+            }
+            for j in (0..<i).reversed() {
+                if let amount = amountsOnly(in: lines[j]).max() { return amount }
             }
         }
         return lines.flatMap(amounts).max()
@@ -94,6 +129,23 @@ enum ReceiptParser {
             let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
                                                            with: "", options: .regularExpression)
             if let amount = amounts(in: withoutPercent).max() { return amount }
+        }
+        return nil
+    }
+
+    /// VSK-hlutfall beint af kvittuninni: „VSK 24% innifalinn", „Þar af VSK 11% 495".
+    /// Sterkasta merkið sem til er — prósentan er prentuð af kassanum sjálfum,
+    /// og virkar jafnvel þegar VSK-upphæðin lesist ekki (t.d. „innifalinn"-lína).
+    private static func guessVatRate(_ lines: [String]) -> Decimal? {
+        for line in lines {
+            let lower = line.lowercased()
+            guard lower.contains("vsk") || lower.contains("virðisaukaskattur") else { continue }
+            guard let re = try? NSRegularExpression(pattern: #"(\d+(?:[.,]\d+)?)\s*%"#),
+                  let m = re.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+                  let r = Range(m.range(at: 1), in: line),
+                  let pct = Decimal(string: line[r].replacingOccurrences(of: ",", with: "."))
+            else { continue }
+            for rate: Decimal in [24, 11] where abs(pct - rate) < 1.5 { return rate }
         }
         return nil
     }
@@ -150,8 +202,10 @@ enum ReceiptParser {
 
 private extension ParsedReceipt {
     /// Ályktar VSK-hlutfall út frá total/vat og smellur á næsta löglega stig.
+    /// Prentuð prósentan á kvittuninni (ef hún fannst) ræður alltaf.
     func withInferredRate() -> ParsedReceipt {
         var copy = self
+        if copy.vatRate != nil { return copy }   // prentuð prósentan ræður
         guard let total, let vat, total > vat, vat > 0 else {
             if total != nil { copy.vatRate = copy.vat == 0 ? 0 : copy.vatRate }
             return copy

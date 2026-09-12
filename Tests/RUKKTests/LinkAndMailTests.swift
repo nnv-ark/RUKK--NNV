@@ -82,6 +82,84 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(ReceiptParser.parse(lines: noTotal).total, 289)
     }
 
+    /// Kt. með bili í stað bandstrikis („640198 2029") er jafn ógild upphæð.
+    func testKennitalaMedBiliIsNotAnAmount() {
+        let lines = ["BÓNUS", "Kt. 640198 2029", "Mjólk 289"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).total, 289)
+    }
+
+    /// Dagsetningar- og tímatölur (11.09.2026 13:42) mega ekki verða upphæðir.
+    func testDateAndTimeNumbersAreNotAmounts() {
+        let lines = ["BÓNUS", "11.09.2026 13:42", "Mjólk 289"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).total, 289)
+        // Ár eitt og sér (2026) er líka hættulegt — það er alltaf stóra talan.
+        let yearOnly = ["VERSLUN", "Ár: 2026", "Vara 450"]
+        XCTAssertEqual(ReceiptParser.parse(lines: yearOnly).total, 450)
+    }
+
+    /// Prósentutala á afslætti („Afsláttur 10%") er ekki upphæð.
+    func testPercentIsNotAnAmount() {
+        let lines = ["VERSLUN", "Afsláttur 10%", "Samtals 450"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).total, 450)
+    }
+
+    /// Dálkaskipt OCR: „Samtals:“ og „1.737 kr.“ koma sem tvær aðskildar
+    /// línur (raunveruleg útkoma Vision af BÓNUS-kvittun). Þá skal para
+    /// lykilorðalínuna við næstu upphæðar-línu — ekki falla á stærstu
+    /// dagsetningartölunni eins og áður (total varð 2026).
+    func testColumnSplitTotalPairsWithAmountLine() {
+        let lines = [   // nákvæmlega það sem Vision skilar fyrir þessa kvittun
+            "BÓNUS",
+            "Laugavegi 59, 101 Reykjavik",
+            "Kt. 640198-2029",
+            "Mjólk", "Braud", "Ostur",
+            "289", "549", "899",
+            "Samtals:",
+            "VSK 24% innifalinn",
+            "11.09.2026 13:42",
+            "Takk fyrir heimsóknina",
+            "1.737 kr.",
+        ]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.total, 1_737)
+        XCTAssertEqual(parsed.vendor, "BÓNUS")
+    }
+
+    /// Þegar hvorki lykilorð né upphæðar-lína finnst: stærsta líkindatölun
+    /// (stakur hlutur) — aldrei kt. eða ártal.
+    func testFallbackNeverPicksDateOrKennitala() {
+        let lines = ["BÓNUS", "Kt. 640198-2029", "11.09.2026", "Mjólk 289"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).total, 289)
+    }
+
+    /// „VSK 24% innifalinn" — engin upphæð, en prósentan gefur hlutfallið
+    /// beint. Þetta er raunveruleg Vision-útkoma af BÓNUS-kvittun.
+    func testVatRateFromPercentOnlyLine() {
+        let lines = [
+            "BÓNUS", "Laugavegi 59, 101 Reykjavik", "Kt. 640198-2029",
+            "Mjólk", "Braud", "Ostur", "289", "549", "899",
+            "Samtals:", "VSK 24% innifalinn", "11.09.2026 13:42",
+            "Takk fyrir heimsóknina", "1.737 kr.",
+        ]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.total, 1_737)
+        XCTAssertEqual(parsed.vatRate, 24)
+        XCTAssertNil(parsed.vat)
+    }
+
+    /// 11% prósentan á VSK-línu ræður — ekki má sjálfgefið falla á 24%.
+    func testVatRateElevenPercentFromLine() {
+        let lines = ["VEITINGAR", "Hamborgari 2.490", "SAMTALS 2.490", "VSK 11% innifalinn"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).vatRate, 11)
+    }
+
+    /// Prentuð prósentan ræður þótt total/vat bendi til annars (OCR-villa
+    /// í upphæð er líklegri en villa í prentaðu hlutfalli).
+    func testPrintedRateWinsOverInferred() {
+        let lines = ["VERSLUN", "SAMTALS 5.000", "Þar af VSK 11% 496"]
+        XCTAssertEqual(ReceiptParser.parse(lines: lines).vatRate, 11)
+    }
+
     func testISODate() {
         let parsed = ReceiptParser.parse(lines: ["VERSLANA MÍN", "2026-09-11", "SAMTALS 1.000"])
         let comps = Calendar.current.dateComponents([.year, .month, .day], from: try! XCTUnwrap(parsed.date))
