@@ -44,26 +44,69 @@ struct ContentView: View {
 
     /// Gluggamyndin sjálf. Aðskilin frá `body` svo hvorug keðjan verði of löng
     /// fyrir þýðandann (hann gefst upp á að tegundagreina eina risakeðju).
+    /// Skipulag eins og VSKIL: lóðrétt táknastika lengst til vinstri,
+    /// fyrirtækjahaus efst í innihaldinu.
     private var splitView: some View {
-        NavigationSplitView {
-            sidebar
-                .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
-        } detail: {
-            detail
+        HStack(spacing: 0) {
+            sectionStrip
+            NavigationSplitView {
+                sidebar
+                    .navigationSplitViewColumnWidth(min: 260, ideal: 320, max: 480)
+            } detail: {
+                VStack(spacing: 0) {
+                    companySwitcher
+                    detail
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                 // Verkþáttur dreginn úr BLIZZ: bætist á opinn reikning, annars
                 // verða til ný drög. Gildir um allan dálkinn — líka auðan.
                 .dropDestination(for: URL.self) { urls, _ in handleTimeDrop(urls) }
-        }
-        .toolbar {
-            // Ósýnilegt atriði sem heldur tækjastikunni í fullri hæð líka þar sem engir
-            // hnappar eiga við (t.d. mælaborðið) — annars fellur hún saman í mjóa rönd
-            // og litastiginn verður helmingi grennri en í hinum gluggunum.
-            ToolbarItem(placement: .navigation) {
-                Color.clear.frame(width: 1, height: 28)
             }
+            .toolbar {
+                // Ósýnilegt atriði sem heldur tækjastikunni í fullri hæð líka þar sem engir
+                // hnappar eiga við (t.d. mælaborðið) — annars fellur hún saman í mjóa rönd
+                // og litastiginn verður helmingi grennri en í hinum gluggunum.
+                ToolbarItem(placement: .navigation) {
+                    Color.clear.frame(width: 1, height: 28)
+                }
+            }
+            .toolbarBackground(Self.titlebarGradient, for: .windowToolbar)
+            .toolbarBackground(.visible, for: .windowToolbar)
         }
-        .toolbarBackground(Self.titlebarGradient, for: .windowToolbar)
-        .toolbarBackground(.visible, for: .windowToolbar)
+    }
+
+    /// Lóðrétt táknastika lengst til vinstri — sama mynstur og VSKIL notar.
+    /// Aðeins tákn; heitið birtist sem vísbending (help).
+    private var sectionStrip: some View {
+        VStack(spacing: 4) {
+            stripButton(.dashboard, takn: "chart.bar.xaxis", heiti: String(localized: "Mælaborð"))
+            stripButton(.invoices, takn: "doc.text", heiti: String(localized: "Reikningar"))
+            stripButton(.estimates, takn: "doc.append", heiti: String(localized: "Tilboð"))
+            stripButton(.expenses, takn: "creditcard", heiti: String(localized: "Kostnaður"))
+            stripButton(.contacts, takn: "person.2", heiti: String(localized: "Viðskiptavinir"))
+            Spacer()
+        }
+        .padding(.top, 14)
+        .padding(.horizontal, 8)
+        .frame(width: 56)
+        .background(.bar)
+        .overlay(alignment: .trailing) { Divider() }
+    }
+
+    private func stripButton(_ item: SidebarItem, takn: String, heiti: String) -> some View {
+        Button { selection = item } label: {
+            Image(systemName: takn)
+                .font(.system(size: 17))
+                .foregroundStyle(selection == item ? Color.primary : Color.secondary)
+                .frame(width: 40, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(Color.primary.opacity(selection == item ? 0.12 : 0))
+                )
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(heiti)
     }
 
     var body: some View {
@@ -128,14 +171,10 @@ struct ContentView: View {
         .customerImport(customerImport, company: activeCompany)
     }
 
-    /// Dálkur 1: fyrirtækjaval, flipar og listi valins hluta — allt í einum
-    /// samanbrjótanlegum dálki (áður var listinn í sérstökum miðjudálki).
+    /// Dálkur 1: listi valins hluta. Fyrirtækjavalið er fært efst í
+    /// innihaldsdálkinn og fliparnir í lóðréttu stikuna — eins og í VSKIL.
     private var sidebar: some View {
-        VStack(spacing: 0) {
-            companySwitcher
-            sectionPicker
-            sidebarList
-        }
+        sidebarList
         // Verkþáttur dreginn beint úr BLIZZ verður að nýjum reikningsdrögum.
         .dropDestination(for: URL.self) { urls, _ in handleSidebarDrop(urls) }
         .alert("Ekkert til að flytja inn",
@@ -254,25 +293,6 @@ struct ContentView: View {
                                            description: Text("Veldu eða búðu til reikning."))
                 }
             }
-    }
-
-    /// Flipar efst í dálki 1 — í stað gömlu hliðarstikunnar.
-    private var sectionPicker: some View {
-        Picker("Hluti", selection: $selection) {
-            Image(systemName: "chart.bar.xaxis").tag(SidebarItem.dashboard)
-                .help("Mælaborð")
-            Image(systemName: "doc.text").tag(SidebarItem.invoices)
-                .help("Reikningar")
-            Image(systemName: "doc.append").tag(SidebarItem.estimates)
-                .help("Tilboð")
-            Image(systemName: "creditcard").tag(SidebarItem.expenses)
-                .help("Kostnaður")
-            Image(systemName: "person.2").tag(SidebarItem.contacts)
-                .help("Viðskiptavinir")
-        }
-        .pickerStyle(.segmented)
-        .labelsHidden()
-        .barHeader(horizontal: 10, vertical: 6)
     }
 
     /// Opnar skráaval fyrir innflutning viðskiptavina (fer fyrst á Viðskiptavinir-flipann).
