@@ -12,24 +12,31 @@ struct SettingsView: View {
     @Query(sort: \AppSettings.companyName) private var companies: [AppSettings]
     @AppStorage("activeCompanyID") private var activeCompanyID = ""
     @State private var selectedID: String = ""
+    @State private var flipi: SettingsFlipi = .snid
 
     private var selected: AppSettings? {
         companies.first { $0.id.uuidString == selectedID } ?? companies.first
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            companyBar
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+        HStack(spacing: 0) {
+            flipaStika
             Divider()
-            if let s = selected {
-                SettingsTabs(settings: s)
-                    .id(s.id)                       // endurræsir flipa þegar skipt er um fyrirtæki
-            } else {
-                ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                companyBar
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                Divider()
+                if let s = selected {
+                    flipaInnihald(s)
+                        .id(s.id)                       // endurræsir flipa þegar skipt er um fyrirtæki
+                        .padding()
+                } else {
+                    ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
             }
         }
+        .navigationTitle(flipi.heiti)
         .frame(minWidth: 620, minHeight: 500)
         .task {
             let company = AppSettings.active(in: context, activeID: activeCompanyID)
@@ -38,8 +45,56 @@ struct SettingsView: View {
         }
     }
 
+    /// Lóðrétt táknastika vinstra megin — sama mynstur og VSKIL notar.
+    /// Aðeins tákn; heitið birtist sem vísbending (help) og í gluggatitli.
+    private var flipaStika: some View {
+        VStack(spacing: 4) {
+            ForEach(SettingsFlipi.allCases) { f in
+                Button { flipi = f } label: {
+                    Image(systemName: f.takn)
+                        .font(.system(size: 17))
+                        .foregroundStyle(flipi == f ? .primary : .secondary)
+                        .frame(width: 40, height: 36)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8)
+                                .fill(Color.primary.opacity(flipi == f ? 0.12 : 0))
+                        )
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(f.heiti)
+            }
+            Spacer()
+        }
+        .padding(.top, 12)
+        .padding(.horizontal, 8)
+        .frame(width: 56)
+    }
+
+    @ViewBuilder
+    private func flipaInnihald(_ s: AppSettings) -> some View {
+        switch flipi {
+        case .snid:      ProfileTab(settings: s)
+        case .reikningur: InvoiceTab(settings: s)
+        case .utlit:     AppearanceTab(settings: s)
+        case .stodur:    StatusesTab()
+        case .tungumal:  LanguageTab(settings: s)
+        case .postvakt:  MailWatchTab()
+        case .vskil:     VskilTab()
+        }
+    }
+
     private var companyBar: some View {
         HStack(spacing: 8) {
+            // Merki fyrirtækisins efst — sami haus og VSKIL sýnir.
+            if let data = selected?.logoData, let img = NSImage(data: data) {
+                Image(nsImage: img)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 28, height: 28)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
             Picker("Fyrirtæki", selection: $selectedID) {
                 ForEach(companies) { c in
                     Text(c.displayName).tag(c.id.uuidString)
@@ -86,33 +141,34 @@ struct SettingsView: View {
     }
 }
 
-private struct SettingsTabs: View {
-    @Bindable var settings: AppSettings
+/// Fliparnir í Stillingum — lóðrétt táknaröð vinstra megin eins og í VSKIL.
+private enum SettingsFlipi: CaseIterable, Identifiable {
+    case snid, reikningur, utlit, stodur, tungumal, postvakt, vskil
 
-    var body: some View {
-        TabView {
-            ProfileTab(settings: settings)
-                .tabItem { Label("Snið", systemImage: "person.crop.square") }
+    var id: Self { self }
 
-            InvoiceTab(settings: settings)
-                .tabItem { Label("Reikningur", systemImage: "doc.text") }
-
-            AppearanceTab(settings: settings)
-                .tabItem { Label("Útlit", systemImage: "textformat") }
-
-            StatusesTab()
-                .tabItem { Label("Stöður", systemImage: "tag") }
-
-            LanguageTab(settings: settings)
-                .tabItem { Label("Tungumál", systemImage: "globe") }
-
-            MailWatchTab()
-                .tabItem { Label("Póstvakt", systemImage: "envelope.badge") }
-
-            VskilTab()
-                .tabItem { Label("VSKIL", systemImage: "arrow.right.doc.on.clipboard") }
+    var heiti: String {
+        switch self {
+        case .snid:       return "Snið"
+        case .reikningur: return "Reikningur"
+        case .utlit:      return "Útlit"
+        case .stodur:     return "Stöður"
+        case .tungumal:   return "Tungumál"
+        case .postvakt:   return "Póstvakt"
+        case .vskil:      return "VSKIL"
         }
-        .padding()
+    }
+
+    var takn: String {
+        switch self {
+        case .snid:       return "person.crop.square"
+        case .reikningur: return "doc.text"
+        case .utlit:      return "textformat"
+        case .stodur:     return "tag"
+        case .tungumal:   return "globe"
+        case .postvakt:   return "envelope.badge"
+        case .vskil:      return "arrow.right.doc.on.clipboard"
+        }
     }
 }
 
