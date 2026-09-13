@@ -246,8 +246,16 @@ private struct MailWatchTab: View {
                     prompt: Text("kvittanir@example.is"))
                 SecureField("Lykilorð / umbóðskóði", text: $password,
                             prompt: Text("geymst í Keychain"))
-                    .onChange(of: password) { _, new in
-                        guard !new.isEmpty else { return }
+                    .onSubmit {
+                        guard !password.isEmpty else { return }
+                        watcher?.settings.setPassword(password)
+                        password = ""
+                        testResult = String(localized: "Lykilorð vistað í Keychain.")
+                    }
+                    .onChange(of: password) { old, new in
+                        // Líming (stök breyting um fleiri en einn staf) vistar
+                        // strax; stafur-sleginn-í-einu vistar með Enter (onSubmit).
+                        guard new.count - old.count > 1 else { return }
                         watcher?.settings.setPassword(new)
                         password = ""
                         testResult = String(localized: "Lykilorð vistað í Keychain.")
