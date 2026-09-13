@@ -55,6 +55,9 @@ struct ContentView: View {
             } detail: {
                 VStack(spacing: 0) {
                     companySwitcher
+                        // Spannar alla breidd dálksins — slík hausrönd og VSKIL
+                        // sýnir (merki vinstra megin, skilrönd tvær yfir).
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     detail
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
@@ -450,6 +453,9 @@ struct ContentView: View {
             }
             .menuStyle(.borderlessButton)
         }
+        // Breiðröðin fyllir dálkinn áður en `.barHeader` leggur flöt og
+        // skilrönd undir — annars verður röndin ekki lengri en textinn.
+        .frame(maxWidth: .infinity, alignment: .leading)
         .barHeader(horizontal: 12, vertical: 8)
     }
 }

@@ -324,7 +324,7 @@ struct InvoiceDetailView: View {
 
             Section("Línur") {
                 ForEach(Array(invoice.orderedItems.enumerated()), id: \.element.persistentModelID) { index, item in
-                    LineItemRow(item: item)
+                    LineItemRow(item: item) { context.delete(item) }
                         // Draga línu upp eða niður; valmyndin er áfram til vara.
                         .draggable(LineItemDrag(index: index)) {
                             Text(item.itemDescription.isEmpty
@@ -505,9 +505,26 @@ struct InvoiceDetailView: View {
 
 private struct LineItemRow: View {
     @Bindable var item: LineItem
+    /// Fjarlægir þessa línu — kölluð úr svif-sýnilega mínus-hnappnum.
+    var onDelete: () -> Void = {}
+    @State private var hovering = false
 
     var body: some View {
-        if item.isHeading { headingRow } else { amountRow }
+        HStack(spacing: 6) {
+            Group {
+                if item.isHeading { headingRow } else { amountRow }
+            }
+            // Mínus-hnappur alltaf sýnilegur (daufur þar til mús kemur yfir
+            // línuna) — sömu staða og „Eyða" í valmyndinni, án hægri-smells.
+            Button(action: onDelete) {
+                Image(systemName: "minus.circle.fill")
+                    .foregroundStyle(hovering ? Color.secondary : Color.gray.opacity(0.35))
+            }
+            .buttonStyle(.borderless)
+            .help("Fjarlægja línu")
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
     }
 
     /// Kaflaskil: aðeins heitið, engar tölur.
