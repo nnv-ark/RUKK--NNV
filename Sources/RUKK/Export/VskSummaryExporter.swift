@@ -196,6 +196,64 @@ enum VskSummaryExporter {
         return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
 
+    // MARK: - Gjalddagi
+
+    /// Gjalddagi tímabils: 5. dagur mánaðarins tveimur mánuðum á eftir
+    /// lokamánuði tímabilsins (jan–feb → 5. apríl). Lendist dagurinn á
+    /// helgi eða almennum frídegi færist hann á næsta virka dag
+    /// („Færður vegna helgi" eins og VSKIL sýnir).
+    static func gjalddagi(ar: Int, timabilNr: Int, kal: Calendar) -> (dags: Date, faerdur: Bool) {
+        var manudur = 2 * timabilNr + 2
+        var arUt = ar
+        if manudur > 12 { manudur -= 12; arUt += 1 }
+        var dags = kal.date(from: DateComponents(year: arUt, month: manudur, day: 5))!
+        var faerdur = false
+        while erFridagur(dags, kal: kal) {
+            faerdur = true
+            dags = kal.date(byAdding: .day, value: 1, to: dags)!
+        }
+        return (dags, faerdur)
+    }
+
+    /// Satt ef dagur er helgi eða íslenskur almennur frídagur. Fastir
+    /// frídagar (1. jan, 1. maí, 17. jún, 24., 25., 26. og 31. des) geta
+    /// aldrei lent á gjalddaga (5. degi) en eru með fyrir almennra nota.
+    static func erFridagur(_ dags: Date, kal: Calendar) -> Bool {
+        let vikudagur = kal.component(.weekday, from: dags)
+        if vikudagur == 1 || vikudagur == 7 { return true }   // sunnu-/laugardagur
+        let y = kal.component(.year, from: dags)
+        let m = kal.component(.month, from: dags)
+        let d = kal.component(.day, from: dags)
+        let fastir: Set<Int> = [101, 501, 617, 1224, 1225, 1226, 1231]
+        if fastir.contains(m * 100 + d) { return true }
+        // Páskatengdir: skírdagur, langaföstudagur, páskadagur, annar í
+        // páskum, uppstigningardagur, hvítasunnudagur, annar í hvítasunnu.
+        let paskar = paskadagur(ar: y, kal: kal)
+        for offset in [-3, -2, 0, 1, 39, 49, 50] {
+            if let h = kal.date(byAdding: .day, value: offset, to: paskar),
+               kal.isDate(h, inSameDayAs: dags) { return true }
+        }
+        // Frídagur verslunarmanna: fyrsti mánudagur í ágúst.
+        if m == 8, let fyrsti = kal.date(from: DateComponents(year: y, month: 8, day: 1)) {
+            let vd1 = kal.component(.weekday, from: fyrsti)
+            if d == 1 + (9 - vd1) % 7 { return true }
+        }
+        return false
+    }
+
+    /// Páskadagur ársins — Anonymous Gregorian reikniritið.
+    static func paskadagur(ar y: Int, kal: Calendar) -> Date {
+        let a = y % 19, b = y / 100, c = y % 100
+        let d = b / 4, e = b % 4, f = (b + 8) / 25, g = (b - f + 1) / 3
+        let h = (19 * a + b - d - g + 15) % 30
+        let i = c / 4, k = c % 4
+        let l = (32 + 2 * e + 2 * i - h - k) % 7
+        let m = (a + 11 * h + 22 * l) / 451
+        return kal.date(from: DateComponents(year: y,
+                                             month: (h + l - 7 * m + 114) / 31,
+                                             day: (h + l - 7 * m + 114) % 31 + 1))!
+    }
+
     /// Kóðar yfirlit sem JSON-gögn (fallega prentað, UTF-8).
     static func gogn(_ payload: VskYfirlitPayload) throws -> Data {
         let encoder = JSONEncoder()

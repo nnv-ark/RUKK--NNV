@@ -200,6 +200,38 @@ final class VskSummaryExporterTests: XCTestCase {
         XCTAssertFalse(p.innkaup.contains { $0.lysing.contains("50.000") })
     }
 
+    /// Gjalddagar: grunnreglan er 5. dagur mánaðarins tveimur á eftir
+    /// lokamánuði; helgi/frídagur færir á næsta virka dag.
+    func testGjalddagiGrunnregla() throws {
+        // maí–jún 2026 → miðvikudagurinn 5. ágúst 2026 (engin færsla).
+        let (d1, f1) = VskSummaryExporter.gjalddagi(ar: 2026, timabilNr: 3, kal: kal)
+        XCTAssertEqual(iso(d1), "2026-08-05")
+        XCTAssertFalse(f1)
+        // nóv–des 2026 → föstudagurinn 5. febrúar 2027 (yfir áramót).
+        let (d2, f2) = VskSummaryExporter.gjalddagi(ar: 2026, timabilNr: 6, kal: kal)
+        XCTAssertEqual(iso(d2), "2027-02-05")
+        XCTAssertFalse(f2)
+    }
+
+    /// 5. desember 2026 er laugardagur → gjalddagi sep–okt færist á mánudag.
+    func testGjalddagiFaerdurVegnaHelgi() throws {
+        let (d, f) = VskSummaryExporter.gjalddagi(ar: 2026, timabilNr: 5, kal: kal)
+        XCTAssertEqual(iso(d), "2026-12-07")
+        XCTAssertTrue(f)
+    }
+
+    /// 5. apríl 2026 er páskadagur (sunnudagur) og 6. apríl annar í páskum
+    /// (frídagur) → gjalddagi jan–feb færist um tvo daga.
+    func testGjalddagiFaerdurVegnaPaska() throws {
+        // Sannreining á páskareikniritinu sjálfu.
+        XCTAssertEqual(iso(VskSummaryExporter.paskadagur(ar: 2026, kal: kal)), "2026-04-05")
+        let (d, f) = VskSummaryExporter.gjalddagi(ar: 2026, timabilNr: 1, kal: kal)
+        XCTAssertEqual(iso(d), "2026-04-07")
+        XCTAssertTrue(f)
+    }
+
+    private func iso(_ d: Date) -> String { VskSummaryExporter.isoDagur(d, kal: kal) }
+
     /// Sundurliðuð færsla (Rafha-dæmið: 1.590 @ 11% + 9.950 @ 24%) verður
     /// ein lína á þrep í innkaupum — samsvarandi sundurliðuninni á kvittuninni.
     func testSundurliðudFaerslaVerdurEinLinaAThrep() throws {

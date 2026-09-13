@@ -557,9 +557,15 @@ private struct VskExportView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("\(VskSummaryExporter.timabilHeiti(timabilNr: t.timabilNr)) \(String(t.ar))")
                     .font(.callout.weight(.medium))
-                Text("Tímabil \(VskSummaryExporter.rskNumer(timabilNr: t.timabilNr))")
+                let g = VskSummaryExporter.gjalddagi(ar: t.ar, timabilNr: t.timabilNr, kal: .current)
+                Text("Gjalddagi: \(gjalddagaTexti(g.dags))")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                if g.faerdur {
+                    Label("Færður vegna helgi", systemImage: "exclamationmark.circle")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
             }
             Spacer()
             if fjoldiReikninga + fjoldiFaerslna > 0 {
@@ -569,6 +575,15 @@ private struct VskExportView: View {
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// „miðvikudagur, 5. ágúst 2026" — alltaf á íslensku, sama snið og VSKIL.
+    private func gjalddagaTexti(_ dags: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "is_IS")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "EEEE, d. MMMM yyyy"
+        return f.string(from: dags)
     }
 
     /// Hleður gögnum og byggir tímabilslistann: frá fyrsta ári með gögn
