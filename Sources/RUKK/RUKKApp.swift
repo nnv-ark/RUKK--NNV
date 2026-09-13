@@ -13,6 +13,8 @@ struct RUKKApp: App {
     let mailWatcher: ExpenseMailWatcher
     /// Tungumál viðmótsins — óháð tungumáli reikninga (sjá Stillingar → Tungumál).
     @AppStorage("uiLanguage") private var uiLanguage: String = AppLanguage.icelandic.rawValue
+    /// Tenging við FELAG — sameiginleg fyrirtækjaskrá VSKIL/RUKK/BLIZZ/LAUNA.
+    @State private var felag = FelagAgent()
 
     init() {
         // Bundle.main velur á milli is.lproj/en.lproj eftir „AppleLanguages“, ekki eftir
@@ -65,6 +67,7 @@ struct RUKKApp: App {
         .modelContainer(container)
         .environment(linkService)
         .environment(mailWatcher)
+        .environment(felag)
         .defaultSize(width: 1200, height: 760)
         // Full hæð á tækjastikunni (eins og í BLIZZ) — ekki samanfallin titilrönd.
         .windowToolbarStyle(.unified(showsTitle: true))
@@ -78,6 +81,7 @@ struct RUKKApp: App {
             SettingsView()
                 .modelContainer(container)
                 .environment(mailWatcher)
+                .environment(felag)
                 .appAppearance()
         }
         .defaultSize(width: 640, height: 760)
