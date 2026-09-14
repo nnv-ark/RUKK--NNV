@@ -114,7 +114,7 @@ final class ExpenseTests: XCTestCase {
                                    vatRate: nil,
                                    vatLines: [.init(rate: 11, net: 1_432, vat: 158),
                                               .init(rate: 24, net: 8_024, vat: 1_926)])
-        ExpenseIntake.apply(parsed, to: expense, dateProvided: false)
+        ExpenseIntake.apply(parsed, to: expense)
         XCTAssertEqual(expense.vendor, "RAFHA")
         XCTAssertEqual(expense.amount, 11_540)
         XCTAssertTrue(expense.isVatSplit)
@@ -132,9 +132,30 @@ final class ExpenseTests: XCTestCase {
                                    vatRate: nil,
                                    vatLines: [.init(rate: 11, net: 1_432, vat: 158),
                                               .init(rate: 24, net: 8_024, vat: 1_926)])
-        ExpenseIntake.apply(parsed, to: expense, dateProvided: false)
+        ExpenseIntake.apply(parsed, to: expense)
         XCTAssertEqual(expense.splitGross24, 11_540)
         XCTAssertEqual(expense.splitGross11, 0)
+    }
+
+    /// Kvittunardagur (úr OCR) ræður alltaf yfir degi sem færslan var stofnuð með
+    /// (skannadagur úr Bill To Book pósthausnum) — kaupdagur stjórnar VSK-tímabili.
+    func testApplyReceiptDateWinsOverIntakeDate() throws {
+        let intakeDate = Date(timeIntervalSince1970: 1_800_000_000)   // skannadagur
+        let expense = Expense(amount: 3_708)
+        expense.date = intakeDate
+        var cal = Calendar(identifier: .gregorian)
+        cal.timeZone = TimeZone(identifier: "Atlantic/Reykjavik")!
+        let receiptDate = cal.date(from: DateComponents(year: 2026, month: 8, day: 27))!
+        let parsed = ParsedReceipt(vendor: "BÓNUS", date: receiptDate, total: 3_708, vat: 421,
+                                   vatRate: nil,
+                                   vatLines: [.init(rate: 11, net: 2_829, vat: 311),
+                                              .init(rate: 24, net: 458, vat: 110)])
+        ExpenseIntake.apply(parsed, to: expense)
+        XCTAssertEqual(expense.date, receiptDate)
+        XCTAssertTrue(expense.isVatSplit)
+        XCTAssertEqual(expense.splitGross11, 3_140)
+        XCTAssertEqual(expense.splitGross24, 568)
+        XCTAssertEqual(expense.vatAmount, 421)
     }
 
     func testMakeNextUsesCompanyDefaults() throws {

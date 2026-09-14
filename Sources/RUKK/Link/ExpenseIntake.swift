@@ -50,7 +50,7 @@ enum ExpenseIntake {
             let parsed = ReceiptParser.parse(lines: lines)
             guard parsed.vendor != nil || parsed.total != nil || parsed.date != nil else { return }
             guard expense.modelContext != nil else { return }   // eytt á meðan
-            apply(parsed, to: expense, dateProvided: date != nil)
+            apply(parsed, to: expense)
         }
         return expense
     }
@@ -58,7 +58,7 @@ enum ExpenseIntake {
     /// Fyllir út færslu úr kvittunarlestri — hreint fall, prófanlegt án OCR.
     /// Tvö eða fleiri VSK-þrep með nettó og VSK á línu (sundurliðunartaflan
     /// neðst á kvittunum: „VSK 11% 1.432 158") virkja sundurliðun sjálfkrafa.
-    static func apply(_ parsed: ParsedReceipt, to expense: Expense, dateProvided: Bool) {
+    static func apply(_ parsed: ParsedReceipt, to expense: Expense) {
         if expense.vendor.isEmpty, let vendor = parsed.vendor {
             expense.vendor = vendor
         }
@@ -83,7 +83,10 @@ enum ExpenseIntake {
         if !expense.isVatSplit, let rate = parsed.vatRate, parsed.total != nil {
             expense.taxRate = rate
         }
-        if let parsedDate = parsed.date, !dateProvided {
+        // Dagsetningin Á kvittuninni er alltaf rétt kaupdagur — sendingardagur
+        // Bill To Book (úr pósthausnum) er skannadagur og getur lent í röngu
+        // VSK-tímabili. Kvittunardagur vinnur því alltaf þegar hann fæst.
+        if let parsedDate = parsed.date {
             expense.date = parsedDate
         }
     }

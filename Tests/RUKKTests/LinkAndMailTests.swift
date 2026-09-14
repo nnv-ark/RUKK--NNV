@@ -211,6 +211,57 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(parsed.vat, 2_084)
     }
 
+    /// BÓNUS-snið: sundurliðunartaflan hefur dálkalykil en ekkert „vsk“-orð
+    /// á sjálfri línunni — „D 11 2.829 311 3.140“ (lykill, hlutfall, nettó,
+    /// VSK, bruttó). Báðar raðirnar þurfa að þekkjast og gefa réttar upphæðir.
+    func testVatTableRowsWithoutVskWord() {
+        let lines = [
+            "BÓNUS",
+            "BÓNUS Holtagörðum",
+            "Kt. 450199-3389",
+            "Dags.: 27.08.26 10:20",
+            "SAMTALS 3.708",
+            "D 11 2.829 311 3.140",
+            "E 24 458 110 568",
+        ]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.total, 3_708)
+        XCTAssertEqual(parsed.vatLines.count, 2)
+        let l11 = parsed.vatLines.first { $0.rate == 11 }
+        XCTAssertEqual(l11?.net, 2_829)
+        XCTAssertEqual(l11?.vat, 311)
+        let l24 = parsed.vatLines.first { $0.rate == 24 }
+        XCTAssertEqual(l24?.net, 458)
+        XCTAssertEqual(l24?.vat, 110)
+        // Heildar-VSK = summa þrepanna (311 + 110 = 421).
+        XCTAssertEqual(parsed.vat, 421)
+        XCTAssertNil(parsed.vatRate)
+    }
+
+    /// Töflulína án dálkalykils og án bruttódálks — „24 8.024 1.926“.
+    func testVatTableRowWithoutKeyAndGross() {
+        let parsed = ReceiptParser.parse(lines: ["VERSLANA", "SAMTALS 9.950", "24 8.024 1.926"])
+        XCTAssertEqual(parsed.vatLines.count, 1)
+        XCTAssertEqual(parsed.vatLines.first?.rate, 24)
+        XCTAssertEqual(parsed.vatLines.first?.net, 8_024)
+        XCTAssertEqual(parsed.vatLines.first?.vat, 1_926)
+    }
+
+    /// Vörulínur, dagsetningar og aðrar tölur meiga EKKI þekkjast sem
+    /// VSK-töflur raðir: bókstafur á eftir hlutfalli eða orð fremst hafnar.
+    func testProductAndDateLinesAreNotVatRows() {
+        let lines = [
+            "BÓNUS",
+            "Dags.: 27.08.26 10:20",
+            "2 stk @ 139 278 D",
+            "pepsi 500 ml uppruna 282 D 201",
+            "SAMTALS 3.708",
+        ]
+        let parsed = ReceiptParser.parse(lines: lines)
+        XCTAssertEqual(parsed.vatLines.count, 0)
+        XCTAssertEqual(parsed.total, 3_708)
+    }
+
     /// Röðsameining: textabútar á sömu sjónröð sameinast vinstri-hægri,
     /// línur á mismunandi hæð halda sér. Grunnurinn að dálkalesstri.
     func testJoinRowsMergesColumns() {

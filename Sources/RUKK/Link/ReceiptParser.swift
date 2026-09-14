@@ -155,26 +155,61 @@ enum ReceiptParser {
     /// VSK-sundurliðunarlínur: allar línur með „vsk" OG prósentu.
     /// Tvær upphæðir á línu = nettó og VSK (VSK er alltaf minna því
     /// hlutföllin eru undir 100%); ein upphæð = VSK-upphæðin ein.
+    /// Að auki er þekkt sundurliðunartaflan án „vsk"-orðs á sjálfri línunni
+    /// (BÓNUS-o.fl.): „D 11 2.829 311 3.140" — dálkalykill, hlutfall, tölur.
     private static func guessVatLines(_ lines: [String]) -> [ParsedReceipt.VatLine] {
         var result: [ParsedReceipt.VatLine] = []
         for line in lines {
             let lower = line.lowercased()
-            guard lower.contains("vsk") || lower.contains("virðisaukaskattur") else { continue }
-            guard let re = try? NSRegularExpression(pattern: #"(\d+(?:[.,]\d+)?)\s*%"#),
-                  let m = re.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
-                  let r = Range(m.range(at: 1), in: line),
-                  let pct = Decimal(string: line[r].replacingOccurrences(of: ",", with: "."))
-            else { continue }
-            guard let rate = [Decimal(24), Decimal(11)].first(where: { abs(pct - $0) < 1.5 })
-            else { continue }
-            let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
-                                                           with: "", options: .regularExpression)
-            let found = amounts(in: withoutPercent).sorted(by: >)
-            result.append(.init(rate: rate,
-                                net: found.count >= 2 ? found[0] : nil,
-                                vat: found.count >= 2 ? found[1] : found.first))
+            if lower.contains("vsk") || lower.contains("virðisaukaskattur") {
+                guard let re = try? NSRegularExpression(pattern: #"(\d+(?:[.,]\d+)?)\s*%"#),
+                      let m = re.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)),
+                      let r = Range(m.range(at: 1), in: line),
+                      let pct = Decimal(string: line[r].replacingOccurrences(of: ",", with: "."))
+                else { continue }
+                guard let rate = [Decimal(24), Decimal(11)].first(where: { abs(pct - $0) < 1.5 })
+                else { continue }
+                let withoutPercent = line.replacingOccurrences(of: #"\d+(?:[.,]\d+)?\s*%"#,
+                                                               with: "", options: .regularExpression)
+                let found = amounts(in: withoutPercent).sorted(by: >)
+                result.append(.init(rate: rate,
+                                    net: found.count >= 2 ? found[0] : nil,
+                                    vat: found.count >= 2 ? found[1] : found.first))
+                continue
+            }
+            if let row = vatTableRow(line) { result.append(row) }
         }
         return result
+    }
+
+    /// Lína úr VSK-taflanni neðst á kvittunum: „D 11 2.829 311 3.140" —
+    /// valfrjáls einn dálkalykil-stafur, hlutfall (11/24), síðan eingöngu
+    /// tölur (nettó, VSK, og stundum bruttó). Vörulínur hafna sér sjálfar
+    /// því þær innihalda bókstafi á eftir hlutfallinu.
+    private static func vatTableRow(_ line: String) -> ParsedReceipt.VatLine? {
+        var rest = line.trimmingCharacters(in: .whitespaces)
+        // Einn stakur stafur má standa fremst („D 11 …") — en ekki orð („Dags …").
+        if let first = rest.first, first.isLetter {
+            let after = rest.dropFirst().trimmingCharacters(in: .whitespaces)
+            guard after.first?.isNumber == true else { return nil }
+            rest = after
+        }
+        guard let rateToken = rest.split(separator: " ").first,
+              let rate = Decimal(string: String(rateToken)),
+              [Decimal(11), Decimal(24)].contains(rate) else { return nil }
+        let afterRate = rest.dropFirst(rateToken.count).trimmingCharacters(in: .whitespaces)
+        guard !afterRate.isEmpty,
+              afterRate.rangeOfCharacter(from: .letters) == nil else { return nil }
+        // Hver tóki fyrir sig — EKKI amounts(in:), sem túlkar bil sem
+        // þúsundaskil og myndi sameina „458 110 568" í eina risatölu.
+        let found = afterRate.split(separator: " ")
+            .compactMap { parseAmount(String($0)) }
+            .sorted(by: >)
+        // Þrjár upphæðir: bruttó > nettó > VSK. Tvær: nettó > VSK.
+        guard found.count >= 2 else { return nil }
+        return found.count >= 3
+            ? .init(rate: rate, net: found[1], vat: found[2])
+            : .init(rate: rate, net: found[0], vat: found[1])
     }
 
     /// Heildar-VSK: summa þrepalína ef þær hafa upphæðir; annars samantekt-
