@@ -144,6 +144,12 @@ struct ContentView: View {
             selection = .expenses
             selectedExpense = expense
         }
+        .onChange(of: mailWatcher?.latestExpense) { _, expense in
+            // Kvittun barst í gegnum póstvaktina — sama hegðun: sýna hana strax.
+            guard let expense else { return }
+            selection = .expenses
+            selectedExpense = expense
+        }
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
             selectedEstimate = nil

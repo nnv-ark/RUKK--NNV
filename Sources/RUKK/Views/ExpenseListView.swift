@@ -53,6 +53,7 @@ struct ExpenseListView: View {
                 .buttonStyle(.borderless)
                 .barHeader()
                 linkStatus
+                mailStatus
             }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -99,6 +100,7 @@ struct ExpenseListView: View {
     }
 
     /// Handvirk póstsókn — birtist þegar póstvakt er stillt í Stillingum.
+    /// Textalýsing (ekki bara tákn) svo takkinn sé auðfundinn.
     @ViewBuilder
     private var mailButton: some View {
         if let watcher = mailWatcher, watcher.settings.isConfigured {
@@ -115,11 +117,55 @@ struct ExpenseListView: View {
                     ProgressView().controlSize(.small)
                 default:
                     Label("Sækja póst", systemImage: "envelope.arrow.triangle.branch")
-                        .labelStyle(.iconOnly)
+                        .lineLimit(1)
                 }
             }
             .fixedSize()
             .help(watcher.state.helpText)
+        }
+    }
+
+    /// Staða póstvaktar — niðurstaða síðustu sóknar og hvenær hún var.
+    /// Gefur svarið „kom eitthvað inn?" án þess að þurfa að giska.
+    @ViewBuilder
+    private var mailStatus: some View {
+        if let watcher = mailWatcher, watcher.settings.isConfigured {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(statusColor(for: watcher.state))
+                    .frame(width: 6, height: 6)
+                Text(statusText(for: watcher))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 4)
+            .background(.bar)
+            .overlay(alignment: .bottom) { Divider() }
+        }
+    }
+
+    private func statusColor(for state: ExpenseMailWatcher.State) -> Color {
+        switch state {
+        case .idle, .checking: .secondary.opacity(0.5)
+        case .ok:              .green
+        case .failed:          .red
+        }
+    }
+
+    private func statusText(for watcher: ExpenseMailWatcher) -> String {
+        switch watcher.state {
+        case .idle:
+            return String(localized: "Póstvakt virk — athugar sjálfkrafa")
+        case .checking:
+            return String(localized: "Sæki póst…")
+        case .ok(let msg), .failed(let msg):
+            if let when = watcher.lastChecked {
+                return "\(msg) · \(when.formatted(date: .omitted, time: .shortened))"
+            }
+            return msg
         }
     }
 

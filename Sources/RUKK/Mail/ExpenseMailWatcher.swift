@@ -30,6 +30,9 @@ final class ExpenseMailWatcher {
 
     private(set) var state: State = .idle
     private(set) var lastChecked: Date?
+    /// Síðasta færsla sem barst í gegnum póstvaktina — ContentView fylgist
+    /// með og færir valið á hana (sama mynstur og RukkLinkService.latestExpense).
+    private(set) var latestExpense: Expense?
 
     let settings = MailboxSettings()
     private var pollTask: Task<Void, Never>?
@@ -100,7 +103,7 @@ final class ExpenseMailWatcher {
                 // Sending úr Bill To Book: fyrirsögn „Receipt #0012 · 2026-09-11“ og
                 // meginmál með „Company: …“. Aðrir póstar fá fyrirsögn sem athugasemd.
                 let meta = BillToBookMeta(from: message)
-                ExpenseIntake.intake(
+                let expense = ExpenseIntake.intake(
                     receipt: attachment.data,
                     source: meta.isBillToBook ? .billToBook : .manual,
                     companyName: meta.company,
@@ -110,6 +113,7 @@ final class ExpenseMailWatcher {
                     in: context,
                     fallbackCompany: company
                 )
+                latestExpense = expense
                 fetched += 1
             }
             try await client.markSeen(uid: uid)
