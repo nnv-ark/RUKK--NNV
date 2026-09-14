@@ -50,6 +50,14 @@ final class MailboxSettings {
     private var service: String { "is.calmail.kula.imap" }
     private var account: String { "\(username)@\(host)" }
 
+    /// Google (o.fl.) sýna app-lykilorð með bilum („ytim tmsw hxhc otka“) —
+    /// notendur líma það eðlilega með bilum, en þjónninn vill 16 stafina
+    /// berba. Hreinsa því bil og línuskil bæði við lestur og skrif, svo
+    /// eldri/löpuð færsla með bilum virki líka.
+    static func normalizePassword(_ password: String) -> String {
+        password.components(separatedBy: .whitespacesAndNewlines).joined()
+    }
+
     func password() -> String? {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -59,12 +67,14 @@ final class MailboxSettings {
         ]
         var item: CFTypeRef?
         guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
-              let data = item as? Data else { return nil }
-        return String(data: data, encoding: .utf8)
+              let data = item as? Data,
+              let raw = String(data: data, encoding: .utf8) else { return nil }
+        let clean = Self.normalizePassword(raw)
+        return clean.isEmpty ? nil : clean
     }
 
     func setPassword(_ password: String) {
-        let data = Data(password.utf8)
+        let data = Data(Self.normalizePassword(password).utf8)
         let base: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

@@ -81,6 +81,7 @@ final class ExpenseMailWatcher {
         guard let password = settings.password() else {
             throw IMAPError.unexpected("lykilorð vantar")
         }
+        watchLog.info("Póstvakt: lykilorð fundið, lengd \(password.count, privacy: .public)")
         let client = IMAPClient(host: settings.host, port: UInt16(settings.port))
         try await client.connect()
         try await client.login(username: settings.username, password: password)

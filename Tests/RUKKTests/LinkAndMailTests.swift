@@ -282,6 +282,16 @@ final class LinkAndMailTests: XCTestCase {
         XCTAssertEqual(comps.year, 2026); XCTAssertEqual(comps.month, 9); XCTAssertEqual(comps.day, 11)
     }
 
+    /// Google sýnir app-lykilorð með bilum („ytim tmsw hxhc otka“) — þau eru
+    /// hreinsuð bæði við lestur og skrif, þannig að líming beint úr Google
+    /// virki án þess að IMAP-innskráning mistakist (AUTHENTICATIONFAILED).
+    func testAppPasswordNormalization() {
+        XCTAssertEqual(MailboxSettings.normalizePassword("ytim tmsw hxhc otka"), "ytimtmswhxhcotka")
+        XCTAssertEqual(MailboxSettings.normalizePassword("ytimtmswhxhcotka"), "ytimtmswhxhcotka")
+        XCTAssertEqual(MailboxSettings.normalizePassword(" ytimtmswhxhcotka\n"), "ytimtmswhxhcotka")
+        XCTAssertEqual(MailboxSettings.normalizePassword("   "), "")
+    }
+
     // MARK: - MIMEMessage
 
     func testMultipartWithPDFAttachment() throws {
