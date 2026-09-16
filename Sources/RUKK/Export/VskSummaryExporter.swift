@@ -115,8 +115,12 @@ enum VskSummaryExporter {
             }
             .sorted { $0.date < $1.date }
 
-        // Sundurliðuð færsla verður ein lína á VSK-þrep (sama sundurliðun og
-        // prentast neðst á kvittuninni: „VSK 11% 1.432 158", „VSK 24% 8.024 1.926").
+        // Sundurliðuð færsla verður ein lína á hverju VSK-þrepi (sama
+        // sundurliðun og prentast neðst á kvittuninni: „VSK 11% 1.432 158",
+        // „VSK 24% 8.024 1.926"). Óúthlutaður munur (upphæð sem ekki ratar
+        // á neitt þrep) fer sem undanþeginn hluti (þrep 0) svo ekkert glatist
+        // á leiðinni yfir í VSKIL — heild innkaupanna er alltaf sú sama og
+        // `amount`.
         let innkaup: [VskYfirlitPayload.Skjal] = kostnadur.flatMap { e -> [VskYfirlitPayload.Skjal] in
             let lysing = "\(e.vendor): \(e.expenseDescription) — \(dagur.string(from: e.date))"
             guard e.isVatSplit else {
@@ -134,8 +138,10 @@ enum VskSummaryExporter {
                                   netto: e.netPart(gross: e.splitGross11, rate: 11),
                                   vsk: e.vatPart(gross: e.splitGross11, rate: 11)))
             }
-            if e.splitGross0 != 0 {
-                rows.append(.init(lysing: lysing, threp: 0, netto: e.splitGross0, vsk: 0))
+            let afinnsla = e.splitGross0 + (e.amount - e.splitGross24 - e.splitGross11 - e.splitGross0)
+            if afinnsla != 0 {
+                rows.append(.init(lysing: lysing, threp: 0,
+                                  netto: afinnsla, vsk: 0))
             }
             return rows
         }

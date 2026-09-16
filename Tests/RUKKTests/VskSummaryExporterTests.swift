@@ -256,6 +256,34 @@ final class VskSummaryExporterTests: XCTestCase {
         XCTAssertEqual(p.samtala.innskattur24, 1_926)
     }
 
+    /// Óúthlutaður munur í sundurliðuðri færslu (þrepin leggjast ekki upp í
+    /// heildarupphæðina) fer sem undanþeginn hluti (þrep 0) — ekkert glatist
+    /// milli RUKK og VSKIL.
+    func testOuthlutadurMunurFerSemThrepNoll() throws {
+        let context = try makeContext()
+        let fyrirtaeki = company(context)
+        let e = kostnadur(context, fyrirtaeki: fyrirtaeki, dagur: "2026-03-10",
+                          amount: 12_000, taxRate: 24)
+        e.isVatSplit = true
+        e.splitGross11 = 1_590
+        e.splitGross24 = 9_950
+        // 12.000 − 1.590 − 9.950 = 460 óúthlutað.
+
+        let expenses = try context.fetch(FetchDescriptor<Expense>())
+        let p = VskSummaryExporter.payload(invoices: [], expenses: expenses,
+                                           company: fyrirtaeki,
+                                           ar: 2026, timabilNr: 2, kal: kal)
+        XCTAssertEqual(p.innkaup.count, 3)
+        let l0 = try XCTUnwrap(p.innkaup.first { $0.threp == 0 })
+        XCTAssertEqual(l0.netto, 460)
+        XCTAssertEqual(l0.vsk, 0)
+        // Heild færslanna er sú sama og amount — ekkert glatast.
+        XCTAssertEqual(p.innkaup.reduce(Decimal(0)) { $0 + $1.netto + $1.vsk }, 12_000)
+        // VSKIL-samantalan telur ekki nettó undanþeginna innkaupa: óbreytt.
+        XCTAssertEqual(p.samtala.innskattur11, 158)
+        XCTAssertEqual(p.samtala.innskattur24, 1_926)
+    }
+
     /// Sjálfvirkur flutningur: exportPeriod skrifar _vskil-skrá fyrir tímabil
     /// færslunnar í möppu — sömu skrá og handvirki útflutningurinn myndi gefa.
     func testExportPeriodSkrifarSkra() throws {
