@@ -33,3 +33,6 @@ Package.resolved
 
 # screenshot scratch
 shots/
+
+# Python cache
+__pycache__/

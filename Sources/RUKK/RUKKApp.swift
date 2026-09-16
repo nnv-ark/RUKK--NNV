@@ -63,6 +63,9 @@ struct RUKKApp: App {
         Window("RUKK", id: "main") {
             RootView()
                 .appAppearance()
+                // Glugginn færist með því að grípa hvar sem er í bakgrunni,
+                // ekki bara í titilröndinni. Hnappar og textareitir virka óbreytt.
+                .windowMovableByBackground()
         }
         .modelContainer(container)
         .environment(linkService)
@@ -86,6 +89,30 @@ struct RUKKApp: App {
         }
         .defaultSize(width: 640, height: 760)
         .environment(\.locale, AppLanguage.from(uiLanguage).locale)
+    }
+}
+
+// MARK: - Gluggi færanlegur hvar sem er
+
+/// Stillir gluggann sem viðheldur þessari sýn þannig að hann færist með
+/// því að grípa og draga hvar sem er í bakgrunni — ekki bara í titilröndinni.
+/// Stýringar (hnappar, reitir, listar) virka óbreytt; aðeins atriði sem
+/// meðhöndla ekki músarsmell sjálf færa gluggann.
+extension View {
+    func windowMovableByBackground() -> some View {
+        background(MovableWindowAnchor())
+    }
+}
+
+private struct MovableWindowAnchor: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { MovableWindowAnchorView() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+private final class MovableWindowAnchorView: NSView {
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        window?.isMovableByWindowBackground = true
     }
 }
 
