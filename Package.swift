@@ -9,7 +9,7 @@ let package = Package(
     ],
     dependencies: [
         // Sameiginleg fyrirtækjaskrá FELAG (nafn, kennitala, VSK, banki, merki…).
-        .package(path: "/Users/olafurhjordisarsonjonsson/Developer/FELAG/FyrirtaekiKit"),
+        .package(path: "/Users/olafurhjordisarsonjonsson/Developer/projects/FELAG/FyrirtaekiKit"),
     ],
     targets: [
         // RUKKApp.swift carries the @main entry point used only by the Xcode app
