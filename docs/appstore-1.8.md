@@ -33,7 +33,10 @@
 4. `xcodebuild -scheme RUKK -configuration Release archive`
 5. Upphleðsla með `xcodebuild -exportArchive` og App Store Connect API-lykli
    (`AuthKey_6W88K32FD3.p8`, issuer `fbc256de-2931-4326-b43c-dc75567c948e`).
-6. EKKI sent í review — notandinn gerir það handvirkt í App Store Connect.
+6. Store-útgáfa 1.8 búin til í gegnum API (`build/asc_release_18.py`),
+   build 12 tengt, What's New (en-US) sett.
+7. Sent í review í gegnum API 2026-09-17 — staða WAITING_FOR_REVIEW
+   (submission `48a011cc-26d7-4f15-b7dd-0a5da2c5d3f5`).
 
 ## Breytingar síðan 1.7 (build 11)
 
