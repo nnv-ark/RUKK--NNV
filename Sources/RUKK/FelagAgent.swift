@@ -60,6 +60,15 @@ final class FelagAgent {
     /// skrá → tengt = false og RUKK notar staðbundnu gögnin óbreytt.
     func endurhlaða() {
         hættaAðgang()
+        // Sameignin með FELAG fyrst — þar þarf hvorki bókamerki né möppuval.
+        // Bókamerkið hér að neðan er varaleið fyrir eldri FELAG utan hennar.
+        if let sameign = CompanyStore.sameign {
+            let file = sameign.load()
+            fyrirtæki = file.companies
+            xmlVirkt = file.active
+            tengt = true
+            return
+        }
         guard let raw = UserDefaults.standard.data(forKey: Self.bookmarkKey) else {
             fyrirtæki = []; tengt = false; return
         }
