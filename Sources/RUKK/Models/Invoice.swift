@@ -25,6 +25,10 @@ final class Invoice {
     var paidAt: Date?                 // sett þegar staða verður „Greitt" (fyrir greiðsluhraða)
     var isEstimate: Bool = false      // tilboð — ekki lagalegur reikningur (convertToInvoice() breytir)
     var estimateNumber: String = ""   // tilboðsnúmer (t.d. R-T001), úthlutað við stofnun
+    /// Stöðugt auðkenni fyrir VSK-yfirlitið sem VSKIL les (útgáfa 2).
+    /// Tómt á eldri færslum þar til `VskSummaryExporter.tryggjaAudkenni`
+    /// fyllir það í — aldrei breytt eftir það, því VSKIL þekkir röðina á því.
+    var vskilAudkenni: String = ""
 
     var isPrinted: Bool { printedAt != nil }
 

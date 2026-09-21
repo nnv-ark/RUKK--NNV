@@ -9,7 +9,7 @@ import SwiftData
 /// í rafræna reikningnum (EInvoiceTotals) svo skýrslan stemmi við reikningana.
 struct VskYfirlitPayload: Codable {
     var tegund = "VSKIL-YFIRLIT"
-    var utgafa = 1
+    var utgafa = 2
     var kennitala: String
     var fyrirtaeki: String
     var vskNumer: String
@@ -28,6 +28,11 @@ struct VskYfirlitPayload: Codable {
         var threp: Int
         var netto: Decimal
         var vsk: Decimal
+        /// Stöðugt auðkenni röðarinnar: auðkenni upprunafærslunnar + þrep.
+        /// VSKIL notar það til að flytja hverja röð inn nákvæmlega einu sinni.
+        var audkenni: String
+        /// Dagsetning færslunnar (yyyy-MM-dd) — VSKIL raðar henni í rétt tímabil.
+        var dagsetning: String
     }
 
     /// Sömu svæði og samantala VSKIL — reiknuð hér af færslunum sjálfum.
@@ -101,7 +106,9 @@ enum VskSummaryExporter {
             let heiti = inv.isCreditNote ? "Kreditreikningur" : "Reikningur"
             for st in totals.subtotals where st.base != 0 || st.tax != 0 {
                 sala.append(.init(lysing: "\(heiti) \(inv.number) — \(dagsetning)",
-                                  threp: threpTala(st.rate), netto: st.base, vsk: st.tax))
+                                  threp: threpTala(st.rate), netto: st.base, vsk: st.tax,
+                                  audkenni: "\(inv.vskilAudkenni)#\(threpTala(st.rate))",
+                                  dagsetning: isoDagur(inv.bookingDate ?? inv.issueDate, kal: kal)))
             }
         }
 
@@ -123,25 +130,31 @@ enum VskSummaryExporter {
         // `amount`.
         let innkaup: [VskYfirlitPayload.Skjal] = kostnadur.flatMap { e -> [VskYfirlitPayload.Skjal] in
             let lysing = "\(e.vendor): \(e.expenseDescription) — \(dagur.string(from: e.date))"
+            let iso = isoDagur(e.date, kal: kal)
             guard e.isVatSplit else {
                 return [.init(lysing: lysing, threp: threpTala(e.taxRate),
-                              netto: e.netAmount, vsk: e.vatAmount)]
+                              netto: e.netAmount, vsk: e.vatAmount,
+                              audkenni: "\(e.vskilAudkenni)#\(threpTala(e.taxRate))",
+                              dagsetning: iso)]
             }
             var rows: [VskYfirlitPayload.Skjal] = []
             if e.splitGross24 != 0 {
                 rows.append(.init(lysing: lysing, threp: 24,
                                   netto: e.netPart(gross: e.splitGross24, rate: 24),
-                                  vsk: e.vatPart(gross: e.splitGross24, rate: 24)))
+                                  vsk: e.vatPart(gross: e.splitGross24, rate: 24),
+                                  audkenni: "\(e.vskilAudkenni)#24", dagsetning: iso))
             }
             if e.splitGross11 != 0 {
                 rows.append(.init(lysing: lysing, threp: 11,
                                   netto: e.netPart(gross: e.splitGross11, rate: 11),
-                                  vsk: e.vatPart(gross: e.splitGross11, rate: 11)))
+                                  vsk: e.vatPart(gross: e.splitGross11, rate: 11),
+                                  audkenni: "\(e.vskilAudkenni)#11", dagsetning: iso))
             }
             let afinnsla = e.splitGross0 + (e.amount - e.splitGross24 - e.splitGross11 - e.splitGross0)
             if afinnsla != 0 {
                 rows.append(.init(lysing: lysing, threp: 0,
-                                  netto: afinnsla, vsk: 0))
+                                  netto: afinnsla, vsk: 0,
+                                  audkenni: "\(e.vskilAudkenni)#0", dagsetning: iso))
             }
             return rows
         }
@@ -159,6 +172,25 @@ enum VskSummaryExporter {
             innkaup: innkaup,
             samtala: samtala(sala: sala, innkaup: innkaup)
         )
+    }
+
+    /// Tryggir að hver reikningur og kostnaðarfærsla beri stöðugt auðkenni
+    /// áður en yfirlit er búið til. Keyrt á undan `payload` á báðum
+    /// útflutningsleiðum; auðkenni sem fyrir er er aldrei endurnotað eða
+    /// breytt, því VSKIL man hvað það hefur þegar flutt inn.
+    @MainActor
+    static func tryggjaAudkenni(invoices: [Invoice], expenses: [Expense],
+                                in context: ModelContext) {
+        var breytt = false
+        for inv in invoices where inv.vskilAudkenni.isEmpty {
+            inv.vskilAudkenni = UUID().uuidString
+            breytt = true
+        }
+        for e in expenses where e.vskilAudkenni.isEmpty {
+            e.vskilAudkenni = UUID().uuidString
+            breytt = true
+        }
+        if breytt { try? context.save() }
     }
 
     /// Sama flokkun og VSKIL notar: sala 24%/11% sérstaklega, önnur sala

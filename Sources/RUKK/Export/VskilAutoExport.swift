@@ -80,6 +80,7 @@ enum VskilAutoExport {
 
         let invoices = (try? context.fetch(FetchDescriptor<Invoice>())) ?? []
         let expenses = (try? context.fetch(FetchDescriptor<Expense>())) ?? []
+        VskSummaryExporter.tryggjaAudkenni(invoices: invoices, expenses: expenses, in: context)
         let payload = VskSummaryExporter.payload(invoices: invoices, expenses: expenses,
                                                  company: company, ar: ar,
                                                  timabilNr: timabilNr, kal: kal)

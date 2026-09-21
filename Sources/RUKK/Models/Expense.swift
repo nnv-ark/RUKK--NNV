@@ -30,6 +30,10 @@ final class Expense {
     var note: String = ""
     /// Hakað við þegar færslan hefur verið yfirfarin (t.d. stemmd við kvittun).
     var reviewed: Bool = false
+    /// Stöðugt auðkenni fyrir VSK-yfirlitið sem VSKIL les (útgáfa 2).
+    /// Tómt á eldri færslum þar til `VskSummaryExporter.tryggjaAudkenni`
+    /// fyllir það í — aldrei breytt eftir það, því VSKIL þekkir röðina á því.
+    var vskilAudkenni: String = ""
     /// Mynd kvittunar (PNG/JPEG-gögn). Fyllt af Bill To Book eða við drop.
     var receiptData: Data?
     var sourceRaw: String = ExpenseSource.manual.rawValue

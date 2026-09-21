@@ -128,7 +128,7 @@ final class VskSummaryExporterTests: XCTestCase {
                                            ar: 2026, timabilNr: 2, kal: kal)
 
         XCTAssertEqual(p.tegund, "VSKIL-YFIRLIT")
-        XCTAssertEqual(p.utgafa, 1)
+        XCTAssertEqual(p.utgafa, 2)
         XCTAssertEqual(p.timabil, 16)
         XCTAssertEqual(p.dagsFra, "2026-03-01")
         XCTAssertEqual(p.dagsTil, "2026-04-30")

@@ -643,6 +643,7 @@ private struct VskExportView: View {
     /// Reiknar yfirlitið fyrir valið tímabil.
     private func reikna() {
         guard let val else { payload = nil; return }
+        VskSummaryExporter.tryggjaAudkenni(invoices: invoices, expenses: expenses, in: context)
         payload = VskSummaryExporter.payload(invoices: invoices, expenses: expenses,
                                              company: company, ar: val.ar,
                                              timabilNr: val.timabilNr, kal: .current)
