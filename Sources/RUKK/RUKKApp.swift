@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import FyrirtaekiKit
 import os
 
 let appLog = Logger(subsystem: "is.calmail.kula", category: "app")
@@ -22,6 +23,10 @@ struct RUKKApp: App {
         // valinu í Stillingar → Tungumál, óháð kerfismáli macOS.
         let uiLang = UserDefaults.standard.string(forKey: "uiLanguage") ?? AppLanguage.icelandic.rawValue
         UserDefaults.standard.set([uiLang], forKey: "AppleLanguages")
+
+        // Skráir RUKK í sameignina með FELAG svo það birtist tengt í
+        // Tengingar-spjaldinu. Gerir ekkert ef réttindin vantar.
+        Sameign.skraSig()
 
         do {
             #if DEBUG

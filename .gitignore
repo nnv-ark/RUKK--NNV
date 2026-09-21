@@ -36,3 +36,6 @@ shots/
 
 # Python cache
 __pycache__/
+
+# Afrit af raungrunni fyrir flutningspróf — aldrei í git
+migration-test/
