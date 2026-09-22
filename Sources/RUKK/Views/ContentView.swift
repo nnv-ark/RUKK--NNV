@@ -151,7 +151,7 @@ struct ContentView: View {
             selectedExpense = expense
         }
         // Óþekktur sími bað um að tengjast — pörun er staðfest einu sinni og munuð.
-        .alert("Nýr sími vill senda kvittanir",
+        .alert(String(localized: "Leyfa \(link?.pendingRequest?.label ?? "") að senda kvittanir?"),
                isPresented: Binding(
                    get: { link?.pendingRequest != nil },
                    set: { if !$0 { link?.denyPendingRequest() } }
@@ -160,7 +160,11 @@ struct ContentView: View {
             Button("Leyfa") { link?.approvePendingRequest() }
             Button("Hafna", role: .cancel) { link?.denyPendingRequest() }
         } message: { request in
-            Text("\(request.label) vill senda skannaðar kvittanir beint í RUKK. Samþykktu aðeins þinn eigin síma.")
+            if request.kynntiSig {
+                Text("Síminn kynnir sig sem \(request.label). Samþykktu aðeins þinn eigin síma — RUKK man hann eftir það.")
+            } else {
+                Text("Nafnið kemur af staðarnetinu en ekki frá símanum sjálfum (eldri útgáfa af Bill To Book), svo þetta gæti verið annað tæki en þú heldur — t.d. hermir á þessari vél. Samþykktu aðeins tæki sem þú þekkir.")
+            }
         }
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin

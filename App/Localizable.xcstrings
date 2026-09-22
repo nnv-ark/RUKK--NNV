@@ -1,17 +1,6 @@
 {
   "sourceLanguage": "is",
   "strings": {
-    "%@ vill senda skannaðar kvittanir beint í RUKK. Samþykktu aðeins þinn eigin síma.": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "%@ wants to send scanned receipts straight into RUKK. Only approve your own phone."
-          }
-        }
-      }
-    },
     "(ekkert nr.)": {
       "extractionState": "manual",
       "localizations": {
@@ -1145,6 +1134,17 @@
         }
       }
     },
+    "Leyfa %@ að senda kvittanir?": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow %@ to send receipts?"
+          }
+        }
+      }
+    },
     "Litur texta": {
       "extractionState": "manual",
       "localizations": {
@@ -1343,6 +1343,17 @@
         }
       }
     },
+    "Nafnið kemur af staðarnetinu en ekki frá símanum sjálfum (eldri útgáfa af Bill To Book), svo þetta gæti verið annað tæki en þú heldur — t.d. hermir á þessari vél. Samþykktu aðeins tæki sem þú þekkir.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This name comes from the local network rather than from the phone itself (an older version of Bill To Book), so it may not be the device you think — a simulator on this Mac, for instance. Only approve a device you recognise."
+          }
+        }
+      }
+    },
     "Netfang": {
       "extractionState": "manual",
       "localizations": {
@@ -1405,17 +1416,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "New invoice for"
-          }
-        }
-      }
-    },
-    "Nýr sími vill senda kvittanir": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "A new phone wants to send receipts"
           }
         }
       }
@@ -1966,6 +1966,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Phone"
+          }
+        }
+      }
+    },
+    "Síminn kynnir sig sem %@. Samþykktu aðeins þinn eigin síma — RUKK man hann eftir það.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The phone identifies itself as %@. Only approve your own phone — RUKK remembers it afterwards."
           }
         }
       }

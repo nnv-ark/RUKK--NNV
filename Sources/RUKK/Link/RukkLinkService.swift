@@ -27,6 +27,10 @@ final class RukkLinkService: NSObject {
         let id = UUID()
         let deviceID: String
         let label: String
+        /// Satt þegar síminn sendi kynningu með boðinu (snið 2+). Annars er
+        /// nafnið aðeins það sem tækið auglýsir á staðarnetinu og segir
+        /// ekkert um hvaða sími þetta er í raun.
+        let kynntiSig: Bool
     }
 
     /// Nafn tengds síma (nil = enginn tengdur). Sýnt í Kostnaðar-hausnum.
@@ -123,7 +127,9 @@ final class RukkLinkService: NSObject {
             return
         }
         pendingHandler = handler
-        pendingRequest = PairingRequest(deviceID: deviceID, label: info?.label ?? peerName)
+        pendingRequest = PairingRequest(deviceID: deviceID,
+                                        label: info?.label ?? peerName,
+                                        kynntiSig: info != nil)
         linkLog.info("RukkLink: pörunarbeiðni frá \(peerName, privacy: .public)")
     }
 
