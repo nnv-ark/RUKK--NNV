@@ -8,6 +8,10 @@ struct ExpenseListView: View {
     @Environment(ExpenseMailWatcher.self) private var mailWatcher: ExpenseMailWatcher?
     @Query private var expenses: [Expense]
     @Binding var selection: Expense?
+    @Environment(\.locale) private var locale
+    /// Mánuðir sem notandinn hefur lagt saman, geymt milli keyrslna.
+    /// Lyklar eru ár*100+mánuður (202609) aðgreindir með kommu.
+    @AppStorage("expenseLokadirManudir") private var lokadirRaw = ""
 
     private let company: AppSettings
 
@@ -23,19 +27,27 @@ struct ExpenseListView: View {
 
     var body: some View {
         List(selection: $selection) {
-            ForEach(expenses) { expense in
-                ExpenseRow(expense: expense)
-                    .tag(expense)
-                    .contextMenu {
-                        Button("Afrita") { duplicate(expense) }
-                        Divider()
-                        Button("Eyða", role: .destructive) {
-                            if selection == expense { selection = nil }
-                            context.delete(expense)
+            ForEach(manudir) { manudur in
+                Section {
+                    if erOpinn(manudur) {
+                        ForEach(manudur.faerslur) { expense in
+                            ExpenseRow(expense: expense)
+                                .tag(expense)
+                                .contextMenu {
+                                    Button("Afrita") { duplicate(expense) }
+                                    Divider()
+                                    Button("Eyða", role: .destructive) {
+                                        if selection == expense { selection = nil }
+                                        context.delete(expense)
+                                    }
+                                }
                         }
+                        .onDelete { eyða($0, í: manudur.faerslur) }
                     }
+                } header: {
+                    manadarHaus(manudur)
+                }
             }
-            .onDelete(perform: delete)
         }
         .navigationTitle("Kostnaður")
         .safeAreaInset(edge: .top, spacing: 0) {
@@ -185,14 +197,90 @@ struct ExpenseListView: View {
         }
     }
 
+    // MARK: - Mánuðir
+
+    /// Einn mánuður í listanum.
+    private struct Manudur: Identifiable {
+        /// ár*100 + mánuður, t.d. 202609 — raðast rétt sem tala.
+        let id: Int
+        let heiti: String
+        let faerslur: [Expense]
+        var samtals: Decimal { faerslur.reduce(0) { $0 + $1.amount } }
+    }
+
+    /// Færslurnar flokkaðar á mánuði, nýjasti mánuður efst. Fyrirspurnin
+    /// skilar þeim þegar í dagsetningarröð, svo röðin innan mánaðar helst.
+    private var manudir: [Manudur] {
+        let dagatal = Calendar.current
+        let snið = DateFormatter()
+        snið.locale = locale
+        snið.setLocalizedDateFormatFromTemplate("MMMM yyyy")
+
+        var röð: [Int] = []
+        var hópar: [Int: [Expense]] = [:]
+        for expense in expenses {
+            let hlutar = dagatal.dateComponents([.year, .month], from: expense.date)
+            let lykill = (hlutar.year ?? 0) * 100 + (hlutar.month ?? 0)
+            if hópar[lykill] == nil { röð.append(lykill) }
+            hópar[lykill, default: []].append(expense)
+        }
+        return röð.compactMap { lykill in
+            guard let faerslur = hópar[lykill], let fyrsta = faerslur.first else { return nil }
+            return Manudur(id: lykill,
+                           heiti: snið.string(from: fyrsta.date),
+                           faerslur: faerslur)
+        }
+    }
+
+    /// Haus mánaðar: nafn, fjöldi og samtala — allur hausinn leggur saman.
+    private func manadarHaus(_ manudur: Manudur) -> some View {
+        Button {
+            leggjaSamanEðaOpna(manudur)
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: erOpinn(manudur) ? "chevron.down" : "chevron.right")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                Text(manudur.heiti)
+                Spacer(minLength: 8)
+                Text("\(manudur.faerslur.count)")
+                    .foregroundStyle(.secondary)
+                    .monospacedDigit()
+                Text(Money.format(manudur.samtals, currencyCode: company.defaultCurrencyCode))
+                    .monospacedDigit()
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(erOpinn(manudur) ? "Leggja mánuðinn saman" : "Opna mánuðinn")
+    }
+
+    private var lokadir: Set<Int> {
+        Set(lokadirRaw.split(separator: ",").compactMap { Int($0) })
+    }
+
+    private func erOpinn(_ manudur: Manudur) -> Bool {
+        !lokadir.contains(manudur.id)
+    }
+
+    private func leggjaSamanEðaOpna(_ manudur: Manudur) {
+        var nýtt = lokadir
+        if nýtt.contains(manudur.id) {
+            nýtt.remove(manudur.id)
+        } else {
+            nýtt.insert(manudur.id)
+        }
+        lokadirRaw = nýtt.sorted().map(String.init).joined(separator: ",")
+    }
+
     private func createExpense() {
         selection = Expense.makeNext(in: context, company: company)
     }
 
-    private func delete(at offsets: IndexSet) {
-        for i in offsets {
-            if selection == expenses[i] { selection = nil }
-            context.delete(expenses[i])
+    private func eyða(_ offsets: IndexSet, í faerslur: [Expense]) {
+        for i in offsets where faerslur.indices.contains(i) {
+            if selection == faerslur[i] { selection = nil }
+            context.delete(faerslur[i])
         }
     }
 
