@@ -103,18 +103,26 @@ final class ExpenseMailWatcher {
                 // Sending úr Bill To Book: fyrirsögn „Receipt #0012 · 2026-09-11“ og
                 // meginmál með „Company: …“. Aðrir póstar fá fyrirsögn sem athugasemd.
                 let meta = BillToBookMeta(from: message)
-                let expense = ExpenseIntake.intake(
+                let result = ExpenseIntake.intake(
                     receipt: attachment.data,
                     source: meta.isBillToBook ? .billToBook : .manual,
                     companyName: meta.company,
+                    kennitala: meta.kennitala,
                     receiptNumber: meta.receiptNumber,
                     date: meta.date,
                     note: meta.isBillToBook ? "" : String(localized: "Úr tölvupósti: \(message.subject)"),
                     in: context,
                     fallbackCompany: company
                 )
-                latestExpense = expense
-                fetched += 1
+                // Sama kvittun gat komið beint í gegnum tenginguna áður —
+                // þá stendur sú færsla og pósturinn bætir engu við.
+                if !result.isDuplicate {
+                    latestExpense = result.expense
+                    fetched += 1
+                } else {
+                    let number = meta.receiptNumber ?? 0
+                    watchLog.info("Póstvakt: kvittun #\(number) var þegar komin — sleppt")
+                }
             }
             try await client.markSeen(uid: uid)
             settings.lastSeenUID = max(settings.lastSeenUID, uid)
@@ -128,6 +136,8 @@ final class ExpenseMailWatcher {
 private struct BillToBookMeta {
     let isBillToBook: Bool
     let company: String?
+    /// Kennitala úr „Kt:“ línunni — sama auðkenni og beina tengingin sendir.
+    let kennitala: String?
     let receiptNumber: Int?
     let date: Date?
 
@@ -135,6 +145,7 @@ private struct BillToBookMeta {
         isBillToBook = message.bodyText.contains("Made with Bill To Book")
             || message.subject.hasPrefix("Receipt #")
         company = Self.field("Company", in: message.bodyText)
+        kennitala = Self.field("Kt", in: message.bodyText)
         receiptNumber = Self.field("Receipt", in: message.bodyText)
             .flatMap { Int($0.replacingOccurrences(of: "#", with: "")) }
         date = Self.field("Date", in: message.bodyText).flatMap {

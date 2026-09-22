@@ -36,6 +36,9 @@ final class Expense {
     var vskilAudkenni: String = ""
     /// Mynd kvittunar (PNG/JPEG-gögn). Fyllt af Bill To Book eða við drop.
     var receiptData: Data?
+    /// Kvittunarnúmer úr teljara Bill To Book (0 = ekkert). Þekkir endursenda
+    /// kvittun svo sama sendingin stofni ekki tvær færslur.
+    var receiptNumber: Int = 0
     var sourceRaw: String = ExpenseSource.manual.rawValue
     var createdAt: Date = Date()
 

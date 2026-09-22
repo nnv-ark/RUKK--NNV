@@ -17,7 +17,11 @@ let package = Package(
         .target(name: "RUKK",
                 dependencies: [.product(name: "FyrirtaekiKit", package: "FyrirtaekiKit")],
                 exclude: ["RUKKApp.swift"]),
-        .testTarget(name: "RUKKTests", dependencies: ["RUKK"],
+        // FyrirtaekiKit beint inn í prófin líka: FELAG-skráin sem fer á milli
+        // tækja er skilgreind þar og prófin bera sniðið saman við hana.
+        .testTarget(name: "RUKKTests",
+                    dependencies: ["RUKK",
+                                   .product(name: "FyrirtaekiKit", package: "FyrirtaekiKit")],
                     resources: [.copy("Fixtures")])
     ]
 )

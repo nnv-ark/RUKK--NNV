@@ -8,27 +8,43 @@ import SwiftData
 @MainActor
 enum ExpenseIntake {
 
-    /// Stofnar Expense úr kvittunargögnum. `companyName` (frá Bill To Book) er
-    /// parað við fyrirtæki í RUKK eftir nafni; finnst ekkert fellur færslan á
-    /// virka fyrirtækið.
+    /// Niðurstaða móttöku: færslan sjálf og hvort hún var þegar til.
+    struct Result {
+        let expense: Expense
+        /// Satt þegar sama kvittun (fyrirtæki + kvittunarnúmer) var þegar komin
+        /// inn — `expense` er þá eldri færslan og engin ný var stofnuð.
+        let isDuplicate: Bool
+    }
+
+    /// Stofnar Expense úr kvittunargögnum. Fyrirtækið er fundið eftir kennitölu
+    /// þegar hún fylgir (FELAG-skráin, snið 3), annars eftir nafni; finnist
+    /// ekkert fellur færslan á virka fyrirtækið. Endursend kvittun (sama númer,
+    /// sama fyrirtæki) stofnar ekki aðra færslu.
     @discardableResult
     static func intake(
         receipt: Data,
         source: ExpenseSource,
         companyName: String? = nil,
+        kennitala: String? = nil,
         receiptNumber: Int? = nil,
         date: Date? = nil,
         note: String = "",
         in context: ModelContext,
         fallbackCompany: AppSettings
-    ) -> Expense {
-        let company = matchCompany(named: companyName, in: context) ?? fallbackCompany
+    ) -> Result {
+        let company = matchCompany(kennitala: kennitala, named: companyName, in: context)
+            ?? fallbackCompany
+        if let receiptNumber,
+           let previous = existingReceipt(number: receiptNumber, company: company, in: context) {
+            return Result(expense: previous, isDuplicate: true)
+        }
         // Námunda fyrir geymslu: stórar myndir fara í 1800px JPEG, PDF helst
         // óbreytt (Bill To Book þjappar þegar sjálft).
         let storedReceipt = ReceiptImage.normalized(receipt)
         let expense = Expense.makeFromBillToBook(in: context, company: company,
                                                  receipt: storedReceipt)
         expense.source = source
+        expense.receiptNumber = receiptNumber ?? 0
         if let date { expense.date = date }
         if let receiptNumber {
             expense.note = note.isEmpty
@@ -52,7 +68,29 @@ enum ExpenseIntake {
             guard expense.modelContext != nil else { return }   // eytt á meðan
             apply(parsed, to: expense)
         }
-        return expense
+        return Result(expense: expense, isDuplicate: false)
+    }
+
+    /// Sama kvittun og barst rétt áðan? Endursending — t.d. þegar staðfestingin
+    /// týndist á leiðinni og síminn reyndi póstleiðina líka — á ekki að stofna
+    /// aðra færslu. Glugginn er vika: teljarinn í Bill To Book byrjar aftur á 1
+    /// eftir enduruppsetningu og þá má gömul #1 ekki stöðva nýja kvittun.
+    private static func existingReceipt(number: Int, company: AppSettings,
+                                        in context: ModelContext) -> Expense? {
+        guard number > 0 else { return nil }
+        let cid = company.id
+        let raw = ExpenseSource.billToBook.rawValue
+        let cutoff = Date.now.addingTimeInterval(-7 * 24 * 60 * 60)
+        var descriptor = FetchDescriptor<Expense>(
+            predicate: #Predicate<Expense> {
+                $0.company?.id == cid
+                    && $0.receiptNumber == number
+                    && $0.sourceRaw == raw
+                    && $0.createdAt > cutoff
+            }
+        )
+        descriptor.fetchLimit = 1
+        return (try? context.fetch(descriptor))?.first
     }
 
     /// Fyllir út færslu úr kvittunarlestri — hreint fall, prófanlegt án OCR.
@@ -91,12 +129,19 @@ enum ExpenseIntake {
         }
     }
 
-    /// Finnr fyrirtæki í RUKK með sama nafni og Bill To Book sendir (samanburður
-    /// bréfhlutfallslegur, þrengdur). Annars nil og köllandi notar virkt fyrirtæki.
-    private static func matchCompany(named name: String?, in context: ModelContext) -> AppSettings? {
+    /// Finnur fyrirtækið sem kvittunin á að falla á. Kennitalan ræður þegar hún
+    /// fylgir — hún kemur úr FELAG-skránni og er sama auðkennið beggja vegna.
+    /// Annars er nafnið borið saman (bréfhlutfallslegt, þrengt) eins og áður.
+    /// Finnist hvorugt skilar fallið nil og köllandi notar virkt fyrirtæki.
+    private static func matchCompany(kennitala: String?, named name: String?,
+                                     in context: ModelContext) -> AppSettings? {
+        let all = (try? context.fetch(FetchDescriptor<AppSettings>())) ?? []
+        if let digits = kennitala?.filter(\.isNumber), !digits.isEmpty,
+           let match = all.first(where: { $0.companyNationalID.filter(\.isNumber) == digits }) {
+            return match
+        }
         guard let name, !name.isEmpty else { return nil }
         let needle = name.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil)
-        let all = (try? context.fetch(FetchDescriptor<AppSettings>())) ?? []
         return all.first {
             $0.companyName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) == needle
                 || $0.displayName.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) == needle

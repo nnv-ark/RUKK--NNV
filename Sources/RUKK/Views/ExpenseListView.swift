@@ -78,6 +78,7 @@ struct ExpenseListView: View {
     }
 
     /// Staða beinnar tengingar við Bill To Book — grænt þegar síminn er tengdur.
+    /// Hægri smellur býður að gleyma pöruðum símum (næsta boð spyr þá aftur).
     @ViewBuilder
     private var linkStatus: some View {
         if let link {
@@ -85,8 +86,7 @@ struct ExpenseListView: View {
                 Circle()
                     .fill(link.connectedPeerName != nil ? Color.green : Color.secondary.opacity(0.5))
                     .frame(width: 6, height: 6)
-                Text(link.connectedPeerName.map { String(localized: "Bill To Book tengt: \($0)") }
-                     ?? String(localized: "Bill To Book — að bíða eftir síma"))
+                Text(linkStatusText(link))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -96,7 +96,23 @@ struct ExpenseListView: View {
             .padding(.vertical, 4)
             .background(.bar)
             .overlay(alignment: .bottom) { Divider() }
+            .contextMenu {
+                if !link.pairedDevices.isEmpty {
+                    Button("Gleyma pöruðum símum") { link.forgetPairings() }
+                }
+            }
         }
+    }
+
+    /// Tengdur sími > paraður sími sem ekki sést > enginn sími enn.
+    private func linkStatusText(_ link: RukkLinkService) -> String {
+        if let name = link.connectedPeerName {
+            return String(localized: "Bill To Book tengt: \(name)")
+        }
+        if let paired = link.pairedDevices.values.sorted().first {
+            return String(localized: "Bill To Book — bíð eftir \(paired)")
+        }
+        return String(localized: "Bill To Book — að bíða eftir síma")
     }
 
     /// Handvirk póstsókn — birtist þegar póstvakt er stillt í Stillingum.

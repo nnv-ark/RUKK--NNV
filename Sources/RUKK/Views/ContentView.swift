@@ -150,6 +150,18 @@ struct ContentView: View {
             selection = .expenses
             selectedExpense = expense
         }
+        // Óþekktur sími bað um að tengjast — pörun er staðfest einu sinni og munuð.
+        .alert("Nýr sími vill senda kvittanir",
+               isPresented: Binding(
+                   get: { link?.pendingRequest != nil },
+                   set: { if !$0 { link?.denyPendingRequest() } }
+               ),
+               presenting: link?.pendingRequest) { _ in
+            Button("Leyfa") { link?.approvePendingRequest() }
+            Button("Hafna", role: .cancel) { link?.denyPendingRequest() }
+        } message: { request in
+            Text("\(request.label) vill senda skannaðar kvittanir beint í RUKK. Samþykktu aðeins þinn eigin síma.")
+        }
         .onChange(of: activeCompanyID) { _, _ in // Using two throwaway parameters to fix the deprecation warning
             selectedInvoice = nil   // gögn annars fyrirtækis eiga ekki að haldast valin
             selectedEstimate = nil

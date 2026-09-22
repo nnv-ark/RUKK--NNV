@@ -1,4 +1,5 @@
 import Foundation
+import FyrirtaekiKit
 import MultipeerConnectivity
 import SwiftData
 import SystemConfiguration
@@ -8,14 +9,25 @@ private let linkLog = Logger(subsystem: "is.calmail.kula", category: "link")
 
 /// Bein tenging RUKK ↔ Bill To Book án pósts og án nets: RUKK auglýsir sig á
 /// staðarnetinu (Bonjour) og Bill To Book í símanum finnur Macinn sjálfkrafa.
-/// Skannar berast dulkritaðir beint milli tækjanna.
+/// Skannar berast dulkóðaðir beint milli tækjanna.
+///
+/// Sími þarf pörun: fyrsta boð frá óþekktu tæki bíður svars notandans og
+/// auðkennið er munað eftir það. Hver móttekin kvittun fær staðfestingu til
+/// baka svo síminn viti hvort hún komst — og geti fallið í póstinn ef ekki.
 @Observable
 @MainActor
 final class RukkLinkService: NSObject {
 
-    /// Bonjour-þjónustutegund — sömu streng notar Bill To Book við leit.
+    /// Bonjour-þjónustutegund — sama streng notar Bill To Book við leit.
     /// (Lágstafir, ≤ 15 stafir — kröfur MC-rammans.)
     static let serviceType = "rukk-link"
+
+    /// Beiðni frá síma sem ekki hefur verið parað við áður.
+    struct PairingRequest: Identifiable, Sendable {
+        let id = UUID()
+        let deviceID: String
+        let label: String
+    }
 
     /// Nafn tengds síma (nil = enginn tengdur). Sýnt í Kostnaðar-hausnum.
     private(set) var connectedPeerName: String?
@@ -23,13 +35,22 @@ final class RukkLinkService: NSObject {
     /// og færir valið á hana.
     private(set) var latestExpense: Expense?
     private(set) var lastError: String?
+    /// Óafgreidd pörunarbeiðni — ContentView birtir staðfestingarglugga.
+    private(set) var pendingRequest: PairingRequest?
+    /// Paraðir símar: auðkenni → nafnið eins og það var þegar parað var.
+    /// Lesið úr UserDefaults þegar `start()` keyrir.
+    private(set) var pairedDevices: [String: String] = [:]
 
     private let container: ModelContainer
     private var myPeerID: MCPeerID?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var session: MCSession?
+    /// Svarhak boðsins sem bíður notandans.
+    private var pendingHandler: ((Bool, MCSession?) -> Void)?
     /// Kallað á aðalþræði — skilar virku fyrirtæki sem færslur falla á.
     private nonisolated let activeCompanyProvider: @MainActor () -> AppSettings?
+
+    private static let pairedKey = "link.pairedDevices"
 
     nonisolated init(container: ModelContainer, activeCompany: @escaping @MainActor () -> AppSettings?) {
         self.container = container
@@ -49,6 +70,7 @@ final class RukkLinkService: NSObject {
 
     /// Hefur auglýsingu á staðarnetinu. Kallað við ræsingu — öruggt að kalla aftur.
     func start() {
+        pairedDevices = UserDefaults.standard.dictionary(forKey: Self.pairedKey) as? [String: String] ?? [:]
         guard advertiser == nil else { return }
         let peerID = MCPeerID(displayName: Self.macName())
         myPeerID = peerID
@@ -59,7 +81,9 @@ final class RukkLinkService: NSObject {
 
         let advertiser = MCNearbyServiceAdvertiser(
             peer: peerID,
-            discoveryInfo: ["app": "rukk", "version": "1"],
+            discoveryInfo: ["app": "rukk",
+                            "version": String(RukkProtocol.version),
+                            "roles": RukkProtocol.roles],
             serviceType: Self.serviceType
         )
         advertiser.delegate = self
@@ -74,35 +98,145 @@ final class RukkLinkService: NSObject {
         session?.disconnect()
         session = nil
         connectedPeerName = nil
+        denyPendingRequest()
+    }
+
+    // MARK: - Pörun
+
+    /// Boð frá síma: þekkt tæki fær já strax, óþekkt bíður notandans.
+    private func handleInvitation(from peerName: String, info: RukkPeerInfo?,
+                                  handler: @escaping (Bool, MCSession?) -> Void) {
+        guard let session else {
+            handler(false, nil)
+            return
+        }
+        // Eldri sími sendir enga kynningu — nafnið verður þá auðkennið.
+        let deviceID = info?.deviceID ?? peerName
+        if pairedDevices[deviceID] != nil {
+            handler(true, session)
+            linkLog.info("RukkLink: þekkt tæki tengist (\(peerName, privacy: .public))")
+            return
+        }
+        guard pendingRequest == nil else {
+            // Ein beiðni í einu — hinni er hafnað og síminn má reyna aftur.
+            handler(false, nil)
+            return
+        }
+        pendingHandler = handler
+        pendingRequest = PairingRequest(deviceID: deviceID, label: info?.label ?? peerName)
+        linkLog.info("RukkLink: pörunarbeiðni frá \(peerName, privacy: .public)")
+    }
+
+    /// Notandinn samþykkti beiðnina — tækið er munað héðan í frá.
+    func approvePendingRequest() {
+        guard let request = pendingRequest, let handler = pendingHandler else { return }
+        pairedDevices[request.deviceID] = request.label
+        UserDefaults.standard.set(pairedDevices, forKey: Self.pairedKey)
+        pendingRequest = nil
+        pendingHandler = nil
+        handler(true, session)
+    }
+
+    /// Notandinn hafnaði — eða glugganum var lokað.
+    func denyPendingRequest() {
+        guard let handler = pendingHandler else {
+            pendingRequest = nil
+            return
+        }
+        pendingRequest = nil
+        pendingHandler = nil
+        handler(false, nil)
+    }
+
+    /// Gleymir öllum pöruðum símum og byrjar upp á nýtt — næsta boð spyr aftur.
+    func forgetPairings() {
+        pairedDevices = [:]
+        UserDefaults.standard.removeObject(forKey: Self.pairedKey)
+        stop()
+        start()
     }
 
     // MARK: - Móttaka
 
     /// Kallað á aðalþræði með fulla sendingu úr Bill To Book.
-    private func handleReceived(_ data: Data) {
+    private func handleReceived(_ data: Data, from peer: MCPeerID) {
         do {
-            let envelope = try RukkEnvelope.decode(data)
+            let frame = try RukkFrame.unpack(data)
+            switch RukkFrame.kind(ofHeader: frame.header) {
+            case "receipt":
+                break
+            case "felag.pull":
+                let pull = try JSONDecoder().decode(RukkFelagPull.self, from: frame.header)
+                sendFelag(nyrraEn: pull.serial, to: peer)
+                return
+            default:
+                // Staðfestingar berast aðeins í hina áttina; annað er hunsað.
+                return
+            }
+            let header = try JSONDecoder().decode(RukkEnvelope.Header.self, from: frame.header)
+            let envelope = RukkEnvelope(header: header, payload: frame.payload)
+            let number = envelope.header.receiptNumber
             guard let company = activeCompanyProvider() else {
                 linkLog.error("RukkLink: ekkert virkt fyrirtæki — sendingu hafnað")
+                lastError = String(localized: "Kvittun barst en ekkert fyrirtæki er virkt.")
+                send(RukkAck(receiptNumber: number, status: .rejected,
+                             reason: "no-active-company"), to: peer)
                 return
             }
             let context = container.mainContext
             let date = DateFormatter.rukkDay.date(from: envelope.header.date)
-            let expense = ExpenseIntake.intake(
+            let result = ExpenseIntake.intake(
                 receipt: envelope.payload,
                 source: .billToBook,
                 companyName: envelope.header.company,
-                receiptNumber: envelope.header.receiptNumber,
+                kennitala: envelope.header.kennitala,
+                receiptNumber: number,
                 date: date,
                 in: context,
                 fallbackCompany: company
             )
             try? context.save()
-            latestExpense = expense
-            linkLog.info("RukkLink: kvittun #\(envelope.header.receiptNumber) móttekin (\(envelope.payload.count) bæti)")
+            if result.isDuplicate {
+                linkLog.info("RukkLink: kvittun #\(number) barst aftur — sama færsla stendur")
+            } else {
+                latestExpense = result.expense
+                linkLog.info("RukkLink: kvittun #\(number) móttekin (\(envelope.payload.count) bæti)")
+            }
+            send(RukkAck(receiptNumber: number,
+                         status: result.isDuplicate ? .duplicate : .stored), to: peer)
         } catch {
             lastError = error.localizedDescription
             linkLog.error("RukkLink: ógild sending — \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Fyrirtækjaskráin úr sameigninni, ef hún er nýrri en sú sem síminn á.
+    /// RUKK ritstýrir henni ekki — FELAG gerir það — heldur ber hana aðeins
+    /// fram, svo FELAG þurfi ekki að vera í gangi.
+    private func sendFelag(nyrraEn serial: Int, to peer: MCPeerID) {
+        guard let session, session.connectedPeers.contains(peer) else { return }
+        guard let skeyti = FelagUtgefandi.skeyti(nyrraEn: serial) else {
+            linkLog.info("RukkLink: FELAG-skráin er óbreytt (raðnúmer \(serial)) — ekkert sent")
+            return
+        }
+        do {
+            let gogn = try RukkFelagPublish.encoded(serial: skeyti.serial,
+                                                    payload: try skeyti.jsonEncoded())
+            try session.send(gogn, toPeers: [peer], with: .reliable)
+            linkLog.info("RukkLink: FELAG-skrá send (raðnúmer \(skeyti.serial), \(skeyti.companies.count) fyrirtæki)")
+        } catch {
+            linkLog.error("RukkLink: FELAG-skrá komst ekki til skila — \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Staðfesting til baka á símann sem sendi.
+    private func send(_ ack: RukkAck, to peer: MCPeerID) {
+        guard let session, session.connectedPeers.contains(peer) else { return }
+        do {
+            let data = try ack.encoded()
+            try session.send(data, toPeers: [peer], with: .reliable)
+        } catch {
+            linkLog.error("RukkLink: staðfesting komst ekki til skila — \(error.localizedDescription, privacy: .public)")
         }
     }
 }
@@ -117,7 +251,7 @@ private extension DateFormatter {
 }
 
 /// Brú fyrir Objective-C endikalla sem ekki eru Sendable-merkt í SDK-inu.
-/// Öruggt hér: MC-skýmerramminn keyrir þá samrunalaust og við köllum aðeins
+/// Öruggt hér: MC-ramminn keyrir þá samrunalaust og við köllum aðeins
 /// þau einu sinni, á aðalþræði.
 private struct UnsafeSendable<T>: @unchecked Sendable { let value: T }
 
@@ -129,10 +263,12 @@ extension RukkLinkService: MCNearbyServiceAdvertiserDelegate {
                                 didReceiveInvitationFromPeer peerID: MCPeerID,
                                 withContext context: Data?,
                                 invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        // Persónuleg tenging milli eigin tækja — boðum er svarað já.
+        // Kynning símans fylgir boðinu (útgáfa 2). Eldri sími sendir ekkert.
+        let info = context.flatMap { try? RukkPeerInfo.decode($0) }
+        let name = peerID.displayName
         let handler = UnsafeSendable(value: invitationHandler)
         Task { @MainActor in
-            handler.value(true, self.session)
+            self.handleInvitation(from: name, info: info, handler: handler.value)
         }
     }
 
@@ -162,8 +298,9 @@ extension RukkLinkService: MCSessionDelegate {
 
     nonisolated func session(_ session: MCSession, didReceive data: Data,
                              fromPeer peerID: MCPeerID) {
+        let peer = UnsafeSendable(value: peerID)
         Task { @MainActor in
-            self.handleReceived(data)
+            self.handleReceived(data, from: peer.value)
         }
     }
 

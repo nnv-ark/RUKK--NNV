@@ -1,6 +1,17 @@
 {
   "sourceLanguage": "is",
   "strings": {
+    "%@ vill senda skannaðar kvittanir beint í RUKK. Samþykktu aðeins þinn eigin síma.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ wants to send scanned receipts straight into RUKK. Only approve your own phone."
+          }
+        }
+      }
+    },
     "(ekkert nr.)": {
       "extractionState": "manual",
       "localizations": {
@@ -162,6 +173,39 @@
           "stringUnit": {
             "state": "translated",
             "value": "Bank account (account no.)"
+          }
+        }
+      }
+    },
+    "Bill To Book tengt: %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bill To Book connected: %@"
+          }
+        }
+      }
+    },
+    "Bill To Book — að bíða eftir síma": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bill To Book — waiting for a phone"
+          }
+        }
+      }
+    },
+    "Bill To Book — bíð eftir %@": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bill To Book — waiting for %@"
           }
         }
       }
@@ -793,6 +837,17 @@
         }
       }
     },
+    "Gleyma pöruðum símum": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Forget paired phones"
+          }
+        }
+      }
+    },
     "Greitt": {
       "extractionState": "manual",
       "localizations": {
@@ -855,6 +910,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Contact"
+          }
+        }
+      }
+    },
+    "Hafna": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decline"
           }
         }
       }
@@ -1002,6 +1068,17 @@
         }
       }
     },
+    "Kvittun barst en ekkert fyrirtæki er virkt.": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A receipt arrived but no company is active."
+          }
+        }
+      }
+    },
     "Langt": {
       "extractionState": "manual",
       "localizations": {
@@ -1053,6 +1130,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "Typeface"
+          }
+        }
+      }
+    },
+    "Leyfa": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Allow"
           }
         }
       }
@@ -1317,6 +1405,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "New invoice for"
+          }
+        }
+      }
+    },
+    "Nýr sími vill senda kvittanir": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A new phone wants to send receipts"
           }
         }
       }

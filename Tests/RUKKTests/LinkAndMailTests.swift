@@ -3,6 +3,8 @@ import Foundation
 import Network
 import AppKit
 import CoreImage
+import SwiftData
+import FyrirtaekiKit
 @testable import RUKK
 
 final class LinkAndMailTests: XCTestCase {
@@ -26,6 +28,145 @@ final class LinkAndMailTests: XCTestCase {
     func testEnvelopeRejectsGarbage() {
         XCTAssertThrowsError(try RukkEnvelope.decode(Data([1, 2])))
         XCTAssertThrowsError(try RukkEnvelope.decode(Data("engin kvittun hér".utf8)))
+    }
+
+    // MARK: - Staðfesting og kynning (snið 2)
+
+    func testAckRoundTrip() throws {
+        let ack = RukkAck(receiptNumber: 12, status: .duplicate)
+        let decoded = try RukkAck.decode(try ack.encoded())
+        XCTAssertEqual(decoded.receiptNumber, 12)
+        XCTAssertEqual(decoded.status, .duplicate)
+        XCTAssertNil(decoded.reason)
+    }
+
+    /// Kvittun og staðfesting mega ekki renna hvor í annarrar stað.
+    func testReceiptAndAckDoNotMix() throws {
+        let ack = try RukkAck(receiptNumber: 3, status: .rejected,
+                              reason: "no-active-company").encoded()
+        XCTAssertThrowsError(try RukkEnvelope.decode(ack))
+        XCTAssertEqual(RukkFrame.kind(ofHeader: try RukkFrame.unpack(ack).header), "ack")
+
+        let receipt = try RukkEnvelope(
+            header: .init(company: "Demó ehf.", receiptNumber: 3, date: "2026-09-11",
+                          mime: "application/pdf", fileName: "receipt-0003.pdf"),
+            payload: Data("%PDF-falskt".utf8)
+        ).encoded()
+        XCTAssertThrowsError(try RukkAck.decode(receipt))
+        XCTAssertEqual(RukkFrame.kind(ofHeader: try RukkFrame.unpack(receipt).header), "receipt")
+    }
+
+    func testPeerInfoRoundTrip() throws {
+        let info = RukkPeerInfo(deviceID: "ABC-123", deviceName: "iPhone", company: "NNV ehf.")
+        let decoded = try RukkPeerInfo.decode(try info.encoded())
+        XCTAssertEqual(decoded.app, "billtobook")
+        XCTAssertEqual(decoded.protocolVersion, RukkProtocol.version)
+        XCTAssertEqual(decoded.deviceID, "ABC-123")
+        XCTAssertEqual(decoded.label, "iPhone · NNV ehf.")
+    }
+
+    // MARK: - FELAG-skráin (snið 3)
+
+    func testFelagPullRoundTrip() throws {
+        let pull = RukkFelagPull(serial: 42)
+        let decoded = try RukkFelagPull.decode(try pull.encoded())
+        XCTAssertEqual(decoded.kind, "felag.pull")
+        XCTAssertEqual(decoded.serial, 42)
+    }
+
+    /// Útgáfan fer sem haus + gögn: hausinn ber raðnúmerið, gögnin skeytið
+    /// sjálft. Síminn þarf að geta þekkt skeytið án þess að afkóða allt.
+    func testFelagPublishCarriesRegisterAsPayload() throws {
+        let skeyti = FelagSkeyti(serial: 99,
+                                 generated: Date(timeIntervalSince1970: 1_700_000_000),
+                                 active: "",
+                                 companies: [Company(name: "NNV ehf.", kennitala: "5301234560")])
+        let gogn = try RukkFelagPublish.encoded(serial: skeyti.serial,
+                                                payload: try skeyti.jsonEncoded())
+        let frame = try RukkFrame.unpack(gogn)
+        XCTAssertEqual(RukkFrame.kind(ofHeader: frame.header), "felag.publish")
+        let header = try JSONDecoder().decode(RukkFelagPublish.self, from: frame.header)
+        XCTAssertEqual(header.serial, 99)
+        XCTAssertEqual(try FelagSkeyti.decode(frame.payload).companies.first?.kennitala,
+                       "5301234560")
+    }
+
+    /// Eldri sími sendir haus án kennitölu — hann verður að afkóðast áfram.
+    func testReceiptHeaderWithoutKennitalaStillDecodes() throws {
+        let json = Data(#"{"kind":"receipt","company":"Demó ehf.","receiptNumber":4,"date":"2026-09-11","mime":"application/pdf","fileName":"receipt-0004.pdf"}"#.utf8)
+        let framed = RukkFrame.pack(header: json, payload: Data("%PDF".utf8))
+        let decoded = try RukkEnvelope.decode(framed)
+        XCTAssertNil(decoded.header.kennitala)
+        XCTAssertEqual(decoded.header.receiptNumber, 4)
+        XCTAssertEqual(decoded.header.company, "Demó ehf.")
+    }
+
+    /// Kennitalan ræður þegar hún fylgir — nafnið má þá vera villandi.
+    @MainActor
+    func testKennitalaDecidesWhichCompanyIsBilled() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Invoice.self, LineItem.self, Contact.self,
+                 AppSettings.self, CustomStatus.self, Expense.self,
+            configurations: config
+        )
+        let context = ModelContext(container)
+
+        let rett = AppSettings()
+        rett.companyName = "NNV ehf."
+        rett.companyNationalID = "530123-4560"        // bandstrik á ekki að skipta máli
+        let hitt = AppSettings()
+        hitt.companyName = "Demó ehf."
+        context.insert(rett)
+        context.insert(hitt)
+
+        let result = ExpenseIntake.intake(
+            receipt: Data([0x89, 0x50, 0x4E, 0x47]),
+            source: .billToBook,
+            companyName: "Demó ehf.",                 // nafnið vísar á rangt fyrirtæki
+            kennitala: "5301234560",
+            receiptNumber: 1,
+            in: context,
+            fallbackCompany: hitt
+        )
+        XCTAssertEqual(result.expense.company, rett)
+    }
+
+    // MARK: - Endursend kvittun
+
+    /// Sama kvittunarnúmer tvisvar (staðfesting týndist og síminn reyndi aftur,
+    /// eða pósturinn kom á eftir tengingunni) á að skila sömu færslu.
+    @MainActor
+    func testResentReceiptDoesNotFileTwice() throws {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(
+            for: Invoice.self, LineItem.self, Contact.self,
+                 AppSettings.self, CustomStatus.self, Expense.self,
+            configurations: config
+        )
+        let context = ModelContext(container)
+        let company = AppSettings()
+        context.insert(company)
+
+        let receipt = Data([0x89, 0x50, 0x4E, 0x47])   // PNG-signature sem sýnigögn
+        let first = ExpenseIntake.intake(receipt: receipt, source: .billToBook,
+                                         receiptNumber: 7, in: context, fallbackCompany: company)
+        try context.save()
+        XCTAssertFalse(first.isDuplicate)
+        XCTAssertEqual(first.expense.receiptNumber, 7)
+
+        let again = ExpenseIntake.intake(receipt: receipt, source: .billToBook,
+                                         receiptNumber: 7, in: context, fallbackCompany: company)
+        try context.save()
+        XCTAssertTrue(again.isDuplicate)
+        XCTAssertEqual(again.expense, first.expense)
+
+        let next = ExpenseIntake.intake(receipt: receipt, source: .billToBook,
+                                        receiptNumber: 8, in: context, fallbackCompany: company)
+        try context.save()
+        XCTAssertFalse(next.isDuplicate)
+
+        XCTAssertEqual(try context.fetch(FetchDescriptor<Expense>()).count, 2)
     }
 
     // MARK: - ReceiptParser
