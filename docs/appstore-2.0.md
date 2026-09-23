@@ -74,3 +74,19 @@ bleikur, fótur segir "Útgáfa 2.0 (15)".
 (`reviewSubmissions` a3fb1998-3623-473d-aa0c-22180f54aa6d). Staða:
 WAITING_FOR_REVIEW, útgáfa eftir samþykki (`AFTER_APPROVAL`) — þ.e. hún
 fer ekki sjálfkrafa í verslun fyrr en ýtt er á hnappinn.
+
+## Athugasemd frá App Review (23. sept. 2026)
+
+Apple hafnaði 2.0 (15) undir **2.4.5(i)** — ekki vegna galla heldur vegna
+spurningar: hvar notar forritið réttindin `com.apple.security.network.server`?
+Apple tók fram að ekki þyrfti nýja byggingu, bara svar í Resolution Center.
+
+Svarið (sent kl. 08:23): réttindin eru fyrir beinu tenginguna við Bill To
+Book. RUKK er móttökuendinn — `MCNearbyServiceAdvertiser` auglýsir
+`_rukk-link._tcp` á staðarnetinu og tekur við tengingu frá símanum. Þar sem
+RUKK hlustar en hringir ekki, dugar `network.client` ekki eitt og sér.
+`NSBonjourServices` og `NSLocalNetworkUsageDescription` eru þegar í
+Info.plist fyrir sömu virkni.
+
+Lærdómur fyrir næstu útgáfur: ný réttindi kalla á skýringu, helst í
+"Notes" reit yfirferðarinnar strax við innsendingu.
