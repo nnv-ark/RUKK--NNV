@@ -67,3 +67,10 @@ Byrjunarskjárinn var daufur og bar gamla merkið. Þessi bygging lagar það:
 SUCCEEDED, Delivery UUID 14593ae4-7684-488b-9032-84bf237d8441. Byggingin
 sett í `/Applications` og kaupskjárinn skoðaður: merkið rétt, glugginn
 bleikur, fótur segir "Útgáfa 2.0 (15)".
+
+## Sent í yfirferð (23. sept. 2026)
+
+Útgáfa 2.0 með byggingu 15 var send í yfirferð kl. 02:46 UTC
+(`reviewSubmissions` a3fb1998-3623-473d-aa0c-22180f54aa6d). Staða:
+WAITING_FOR_REVIEW, útgáfa eftir samþykki (`AFTER_APPROVAL`) — þ.e. hún
+fer ekki sjálfkrafa í verslun fyrr en ýtt er á hnappinn.
