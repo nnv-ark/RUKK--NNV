@@ -47,4 +47,51 @@ private struct AppAppearanceModifier: ViewModifier {
 extension View {
     /// Fylgir valinu í Stillingar → Útlit.
     func appAppearance() -> some View { modifier(AppAppearanceModifier()) }
+
+    /// Leggur bleikan blæ á gluggann sjálfan (rönd, titilsvæði og allt sem
+    /// innihaldið málar ekki yfir).
+    func rukkWindowTint() -> some View { background(WindowTint()) }
+}
+
+// MARK: - Bleikur blær
+
+extension Color {
+    /// Húsalitur RUKK-gluggans. Daufur með vilja — hann á að sjást í
+    /// jaðrinum en ekki keppa við innihaldið. Vilji maður sterkari eða
+    /// daufari blæ er það þessi eini staður.
+    static let rukkWindow = Color(nsColor: .rukkWindow)
+    /// Bakgrunnur áskriftarskjásins efst í stiglinum.
+    static let rukkBlushTop = Color(nsColor: .rukkBlushTop)
+}
+
+extension NSColor {
+    static let rukkWindow = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.137, green: 0.106, blue: 0.122, alpha: 1)   // #231B1F
+            : NSColor(srgbRed: 0.992, green: 0.961, blue: 0.973, alpha: 1)   // #FDF5F8
+    }
+
+    static let rukkBlushTop = NSColor(name: nil) { appearance in
+        appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            ? NSColor(srgbRed: 0.200, green: 0.137, blue: 0.169, alpha: 1)   // #33232B
+            : NSColor(srgbRed: 0.976, green: 0.902, blue: 0.929, alpha: 1)   // #F9E6ED
+    }
+}
+
+/// Setur litinn beint á NSWindow — SwiftUI-bakgrunnur nær ekki yfir
+/// titilröndina, svo glugginn verður annars tvílitur.
+private struct WindowTint: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView()
+        apply(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) { apply(to: nsView) }
+
+    private func apply(to view: NSView) {
+        DispatchQueue.main.async {
+            view.window?.backgroundColor = .rukkWindow
+        }
+    }
 }

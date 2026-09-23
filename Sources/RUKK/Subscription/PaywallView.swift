@@ -1,5 +1,6 @@
 import SwiftUI
 import StoreKit
+import AppKit
 
 /// Áskriftarskjár — sýndur þegar engin virk áskrift er. Lokar á allt appið.
 struct PaywallView: View {
@@ -16,6 +17,23 @@ struct PaywallView: View {
         return "\(String(localized: "Útgáfa")) \(version) (\(build))  ·  © 2026 NNV.ehf"
     }
 
+    /// Merkið kemur beint úr forritinu sjálfu, ekki úr afriti í Assets — þá
+    /// fylgir það sjálfkrafa hverri endurnýjun á tákninu og getur ekki orðið
+    /// eftir gamalt eins og „Logo" gerði.
+    private var merki: Image {
+        if let icon = NSApplication.shared.applicationIconImage {
+            return Image(nsImage: icon)
+        }
+        return Image("Logo")
+    }
+
+    /// Daufur bleikur stigull — sami húsalitur og glugginn ber.
+    private var bakgrunnur: some View {
+        LinearGradient(colors: [.rukkBlushTop, .rukkWindow],
+                       startPoint: .top, endPoint: .bottom)
+        .ignoresSafeArea()
+    }
+
     private let features: [(icon: String, text: LocalizedStringKey)] = [
         ("building.2", "Mörg fyrirtæki? Ekkert mál! Auðvelt að skipta á milli — og kostar ekki aukalega."),
         ("chart.bar.xaxis", "Mælaborð: sala, innheimt, útistandandi og greiðsluhraði — meiri upplýsingar á leiðinni."),
@@ -26,34 +44,41 @@ struct PaywallView: View {
         VStack(spacing: 0) {
             Spacer(minLength: 24)
 
-            Image("Logo")
+            merki
                 .resizable().scaledToFit()
-                .frame(width: 96, height: 96)
-                .clipShape(Circle())
-                .shadow(radius: 8, y: 4)
+                .frame(width: 112, height: 112)
+                .shadow(color: .black.opacity(0.18), radius: 10, y: 5)
 
             Text("RUKK")
-                .font(.largeTitle.weight(.bold))
-                .padding(.top, 12)
+                .font(.system(size: 44, weight: .bold, design: .rounded))
+                .padding(.top, 14)
             Text("Reikningagerð fyrir íslensk fyrirtæki og verktaka")
                 .font(.title3)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
 
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
                 ForEach(features, id: \.icon) { feature in
                     Label {
                         Text(feature.text)
                     } icon: {
                         Image(systemName: feature.icon)
+                            .font(.title3)
                             .foregroundStyle(.tint)
-                            .frame(width: 24)
+                            .frame(width: 28)
                     }
                     .font(.body)
                 }
             }
-            .padding(.vertical, 28)
-            .frame(maxWidth: 420, alignment: .leading)
+            .padding(20)
+            .frame(maxWidth: 440, alignment: .leading)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.primary.opacity(0.06))
+            )
+            .padding(.vertical, 26)
 
             Spacer(minLength: 12)
 
@@ -76,7 +101,7 @@ struct PaywallView: View {
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(.background)
+        .background(bakgrunnur)
     }
 
     @ViewBuilder

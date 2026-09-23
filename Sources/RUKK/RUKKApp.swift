@@ -68,6 +68,7 @@ struct RUKKApp: App {
         Window("RUKK", id: "main") {
             RootView()
                 .appAppearance()
+                .rukkWindowTint()
                 // Glugginn færist með því að grípa hvar sem er í bakgrunni,
                 // ekki bara í titilröndinni. Hnappar og textareitir virka óbreytt.
                 .windowMovableByBackground()
