@@ -47,3 +47,23 @@ Beina tengingin við síma hefur ekki verið keyrð enda-í-enda: Bill To Book
 1.2 (3) er nýkomið í verslun en ber hvorki nafnreitinn né neitt sem reynir
 á FELAG-skrána. Prófa þarf pörun, staðfestingu og skrána með síma áður en
 hægt er að treysta þeim í raunnotkun.
+
+## Bygging 15 (23. sept. 2026)
+
+Byrjunarskjárinn var daufur og bar gamla merkið. Þessi bygging lagar það:
+
+- **Lifandi forritsmerki.** Kaupskjárinn sækir `NSApplication.shared
+  .applicationIconImage` í stað gamallar `Logo`-myndar, 112 pt, óklippt —
+  svo merkið á skjánum er alltaf það sama og í Dock og Finder.
+- **Nýtt yfirbragð.** Heitið í ávalri feitletrun, kostirnir á spjaldi úr
+  `.regularMaterial`, bakgrunnur með halla úr `rukkBlushTop` í `rukkWindow`.
+- **Daufbleikir gluggar.** `rukkWindowTint()` setur `NSWindow.backgroundColor`
+  á `NSColor.rukkWindow` — #FDF5F8 í ljósu, #231B1F í dökku — svo liturinn
+  fylgir útliti kerfisins og nær líka undir hliðarstikuna.
+
+Útgáfuferlið eins og fyrir byggingu 14: 161 einingapróf græn (2 sleppt),
+`CURRENT_PROJECT_VERSION` 14 -> 15, `xcodebuild archive` og
+`-exportArchive`, svo `xcrun altool --upload-app -t macos`. UPLOAD
+SUCCEEDED, Delivery UUID 14593ae4-7684-488b-9032-84bf237d8441. Byggingin
+sett í `/Applications` og kaupskjárinn skoðaður: merkið rétt, glugginn
+bleikur, fótur segir "Útgáfa 2.0 (15)".
