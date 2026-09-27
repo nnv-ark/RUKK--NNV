@@ -90,3 +90,23 @@ Info.plist fyrir sömu virkni.
 
 Lærdómur fyrir næstu útgáfur: ný réttindi kalla á skýringu, helst í
 "Notes" reit yfirferðarinnar strax við innsendingu.
+
+## Útgáfa 2.16 (27. sept. 2026)
+
+**Nýtt útgáfunúmerakerfi:** útgáfa = `2.<bygging>`, þ.e. `MARKETING_VERSION`
+2.16 og `CURRENT_PROJECT_VERSION` 16. Næsta verður 2.17 (17) o.s.frv.
+
+Í þessari byggingu:
+
+- PDF heitir alltaf „Reikningur-[númer].pdf“ (tilboð „Tilboð-[nr]“) —
+  líka „Vista sem PDF“ úr prentglugganum.
+- Öll rauða titilröndin grípur gluggann (titillinn tekinn úr röndinni).
+- Glugginn skalast frjálst: með þrjá dálka fer lágmarksbreidd úr 1297 pt
+  í 957 pt (forsýn í HStack með dragganlegum skilum í stað HSplitView).
+- Fela RUKK ⌘H / Fela önnur ⌥⌘H / Sýna öll alltaf í valmyndinni.
+- VSK-yfirlit skrifast í sameign FELAG, merkt kennitölu fyrirtækisins.
+
+Ferlið: 161 einingapróf græn (2 sleppt), `xcodebuild archive` og
+`-exportArchive`, `xcrun altool --upload-app -t macos`. UPLOAD SUCCEEDED,
+Delivery UUID aa84b00c-4ca2-4c41-a6d1-be6dff888125. Útgáfufærslan sem hét
+„2.0 (16)“ endurnefnd 2.16.
