@@ -682,6 +682,9 @@ private struct VskExportView: View {
             villa = String(localized: "Ekki tókst að kóða yfirlitið.")
             return
         }
+        // Alltaf í FELAG fyrir VSKIL, merkt kennitölu þessa fyrirtækis.
+        VskilAutoExport.skrifaISameign(gogn, kennitala: company.companyNationalID, ar: val.ar,
+                                       timabil: VskSummaryExporter.rskNumer(timabilNr: val.timabilNr))
 
         let panel = NSSavePanel()
         panel.allowedContentTypes = [.json]

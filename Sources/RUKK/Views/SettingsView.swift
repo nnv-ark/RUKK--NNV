@@ -188,8 +188,8 @@ private struct VskilTab: View {
                     set: { enabled = $0; VskilAutoExport.isEnabled = $0 }))
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("VSKIL-mappa")
-                        Text(folder?.path ?? String(localized: "Engin mappa valin"))
+                        Text("Afrit í möppu (valkvætt)")
+                        Text(folder?.path ?? String(localized: "Engin mappa — yfirlitið fer eingöngu í FELAG"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
@@ -205,7 +205,7 @@ private struct VskilTab: View {
                 }
             }
             Section {
-                Text("Þegar þú hakkar „Búið að yfirfara“ á kostnaðarfærslu endurreiknar RUKK VSK-yfirlitið fyrir tímabilið og skrifar það í VSKIL-möppuna. VSKIL les skrána („Hlaupa úr RUKK…“) með nýjustu stöðunni. Aðeins yfirfarðar færslur fara með.")
+                Text("Þegar þú hakkar „Búið að yfirfara“ á kostnaðarfærslu endurreiknar RUKK VSK-yfirlitið fyrir tímabilið og setur það í FELAG, merkt kennitölu fyrirtækisins. VSKIL sækir það þaðan með „Úr RUKK…“ — hvert fyrirtæki fær aðeins sín eigin yfirlit. Aðeins yfirfarðar færslur fara með. Mappan hér er aðeins aukaafrit.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }

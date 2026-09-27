@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 import AppKit
+import FyrirtaekiKit
 
 /// Sjálfvirkur VSKIL-flutningur: þegar kostnaðarfærslu er hakað „Búið að
 /// yfirfara" (eða hákkið tekið af) er VSK-yfirlitið fyrir tímabilið
@@ -8,14 +9,20 @@ import AppKit
 /// útflutningurinn (`_vskil-<kt>-<ár>-<tímabil>.json`), svo VSKIL tekur
 /// alltaf inn nýjustu stöðuna.
 ///
-/// Mappan er utan sandkassans — notandinn velur hana einu sinni og RUKK
-/// geymir app-scope bókamerki (com.apple.security.files.bookmarks.app-scope).
+/// Yfirlitið fer alltaf í sameign FELAG, merkt kennitölu fyrirtækisins
+/// (`Sameign.yfirlitURL`) — þaðan sækir VSKIL það fyrir virkt fyrirtæki og
+/// ekkert annað. Hvert fyrirtæki hefur þannig sínar skrár; þau blandast aldrei.
+///
+/// Valkvætt er líka hægt að skrifa afrit í eigin möppu — hún er utan
+/// sandkassans, notandinn velur hana einu sinni og RUKK geymir app-scope
+/// bókamerki (com.apple.security.files.bookmarks.app-scope).
 enum VskilAutoExport {
     private static let enabledKey = "vskilAuto.enabled"
     private static let bookmarkKey = "vskilAuto.folderBookmark"
 
     static var isEnabled: Bool {
-        get { UserDefaults.standard.bool(forKey: enabledKey) }
+        // Sjálfgefið kveikt: yfirlitið fer í FELAG án þess að neitt þurfi að stilla.
+        get { UserDefaults.standard.object(forKey: enabledKey) as? Bool ?? true }
         set { UserDefaults.standard.set(newValue, forKey: enabledKey) }
     }
 
@@ -55,7 +62,8 @@ enum VskilAutoExport {
     @MainActor
     @discardableResult
     static func expenseReviewChanged(_ expense: Expense, in context: ModelContext) -> String? {
-        guard isEnabled, let folder = folderURL, let company = expense.company else { return nil }
+        guard isEnabled, let company = expense.company else { return nil }
+        let folder = folderURL
         let kal = Calendar.current
         do {
             let url = try exportPeriod(containing: expense.date, company: company,
@@ -73,7 +81,7 @@ enum VskilAutoExport {
     @MainActor
     @discardableResult
     static func exportPeriod(containing date: Date, company: AppSettings,
-                             to folder: URL, in context: ModelContext,
+                             to folder: URL?, in context: ModelContext,
                              kal: Calendar) throws -> URL {
         let ar = kal.component(.year, from: date)
         let timabilNr = VskSummaryExporter.numerTimabils(dags: date, kal: kal)
@@ -86,11 +94,27 @@ enum VskilAutoExport {
                                                  timabilNr: timabilNr, kal: kal)
         let gogn = try VskSummaryExporter.gogn(payload)
 
-        let nafn = "_vskil-\(company.companyNationalID)-\(ar)-\(VskSummaryExporter.rskNumer(timabilNr: timabilNr)).json"
+        let rsk = VskSummaryExporter.rskNumer(timabilNr: timabilNr)
+        let iFelag = skrifaISameign(gogn, kennitala: company.companyNationalID, ar: ar, timabil: rsk)
+        guard let folder else {
+            guard let iFelag else { throw CocoaError(.fileWriteNoPermission) }
+            return iFelag
+        }
+        let nafn = "_vskil-\(company.companyNationalID)-\(ar)-\(rsk).json"
         let url = folder.appendingPathComponent(nafn)
         let accessing = folder.startAccessingSecurityScopedResource()
         defer { if accessing { folder.stopAccessingSecurityScopedResource() } }
         try gogn.write(to: url, options: .atomic)
         return url
+    }
+
+    /// Skrifar yfirlitið í sameign FELAG undir kennitölu fyrirtækisins —
+    /// þar sækir VSKIL það. Nil ef kennitölu vantar (þá veit enginn hvaða
+    /// fyrirtæki á skrána og hún er ekki skrifuð) eða sameignin er ekki til.
+    @discardableResult
+    static func skrifaISameign(_ gogn: Data, kennitala: String, ar: Int, timabil: Int) -> URL? {
+        guard let url = Sameign.yfirlitURL(kennitala: kennitala, ar: ar, timabil: timabil)
+        else { return nil }
+        return (try? gogn.write(to: url, options: .atomic)) != nil ? url : nil
     }
 }
