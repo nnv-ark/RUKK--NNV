@@ -79,7 +79,11 @@ struct RUKKApp: App {
         .environment(felag)
         .defaultSize(width: 1200, height: 760)
         // Full hæð á tækjastikunni (eins og í BLIZZ) — ekki samanfallin titilrönd.
-        .windowToolbarStyle(.unified(showsTitle: true))
+        // Titillinn er EKKI sýndur í röndinni: á macOS 26+ er titilsvæðið (NSToolbarTitleView)
+        // gagnvirkur hnappur sem fyllir miðju randarinnar og gleypir músardrátt — þar var
+        // ekki hægt að grípa gluggann. Án hans er öll rauða röndin venjulegt, dragganlegt
+        // titilsvæði. Glugginn heldur heitinu (Window-valmynd, Mission Control).
+        .windowToolbarStyle(.unified(showsTitle: false))
         // Frjálst skalanlegur gluggi (innihald ræður lágmarki). `Window` fær annars
         // `.contentSize` sjálfgefið sem gerir hann erfiðan að stækka/minnka.
         .windowResizability(.contentMinSize)
@@ -192,6 +196,15 @@ struct RUKKCommands: Commands {
     @FocusedValue(\.importCustomers) private var importCustomers
 
     var body: some Commands {
+        // Fela / Fela önnur / Sýna öll — skráð sérstaklega svo ⌘H og ⌥⌘H séu ALLTAF í
+        // RUKK-valmyndinni, óháð tungumáli og því hvað SwiftUI setur þar sjálfgefið.
+        CommandGroup(replacing: .appVisibility) {
+            Button("Fela RUKK") { NSApp.hide(nil) }
+                .keyboardShortcut("h", modifiers: .command)
+            Button("Fela önnur") { NSApp.hideOtherApplications(nil) }
+                .keyboardShortcut("h", modifiers: [.command, .option])
+            Button("Sýna öll") { NSApp.unhideAllApplications(nil) }
+        }
         CommandGroup(replacing: .newItem) {
             Button("Nýr reikningur") { newInvoice?() }
                 .keyboardShortcut("n", modifiers: .command)

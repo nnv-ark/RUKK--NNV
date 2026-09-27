@@ -33,6 +33,8 @@ struct InvoiceDetailView: View {
     }
 
     @State private var isShowingPreview = true
+    /// Breidd forsýnarinnar — munuð milli ræsinga. Stillt með því að draga skilin.
+    @AppStorage("invoicePreviewWidth") private var previewWidth: Double = 480
     @State private var previewZoom: PreviewZoom = .fit
     @State private var showingCalendarImport = false
     @State private var showingTymeImport = false
@@ -93,13 +95,20 @@ struct InvoiceDetailView: View {
     }
 
     var body: some View {
-        HSplitView {
+        // Forsýn og reikningsform hlið við hlið í einni HStack — EKKI HSplitView eða
+        // `.inspector`. Mælt á macOS 27: báðar leiðir setja fast ~600 pt lágmark á
+        // formið inni í NavigationSplitView og gera forsýnarbreiddina að lágmarki gluggans,
+        // svo með þrjá dálka mátti aðeins stækka gluggann upp og niður. Hér ræður
+        // innihaldið sjálft: glugginn minnkar fyrst á kostnað formsins (niður í 340 pt),
+        // síðan forsýnarinnar (niður í 300 pt). Skilin má draga eins og í Finder.
+        HStack(spacing: 0) {
             form
-                .frame(minWidth: 380, idealWidth: 460)
-
+                .frame(minWidth: 340, maxWidth: .infinity)
             if isShowingPreview {
+                PaneResizeDivider(width: $previewWidth, range: 300...1400)
                 previewPane
-                    .frame(minWidth: 340, idealWidth: 520)
+                    .frame(minWidth: 300, idealWidth: previewWidth, maxWidth: previewWidth)
+                    .layoutPriority(1)
             }
         }
         .navigationTitle(invoice.isEstimate
@@ -647,5 +656,35 @@ private struct InvoiceToolbar: ToolbarContent {
             .disabled(!isExportable)
             .help(isExportable ? "" : notIssuedHelp)
         }
+    }
+}
+
+/// Lóðrétt skil milli forms og forsýnar: 1 pt lína, breiðara gripsvæði og
+/// venjulegi macOS-bendillinn fyrir dálkastærð. Dregið til vinstri = breiðari forsýn.
+private struct PaneResizeDivider: View {
+    @Binding var width: Double
+    let range: ClosedRange<Double>
+    @State private var startWidth: Double?
+
+    var body: some View {
+        Divider()
+            .frame(width: 1)
+            .overlay {
+                Color.clear
+                    .frame(width: 9)
+                    .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { NSCursor.resizeLeftRight.push() } else { NSCursor.pop() }
+                    }
+                    .gesture(
+                        DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                            .onChanged { value in
+                                let start = startWidth ?? width
+                                startWidth = start
+                                width = min(max(start - value.translation.width, range.lowerBound), range.upperBound)
+                            }
+                            .onEnded { _ in startWidth = nil }
+                    )
+            }
     }
 }

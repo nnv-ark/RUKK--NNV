@@ -125,12 +125,12 @@ final class EstimateTests: XCTestCase {
         let company = makeCompany(context)
 
         let est = Invoice.makeEstimate(in: context, company: company)
-        XCTAssertEqual(est.documentFileName, "R-T001")
+        XCTAssertEqual(est.documentFileName, "Tilboð-R-T001")
 
         let inv = Invoice.makeNext(in: context, company: company)
-        XCTAssertEqual(inv.documentFileName, "reikningur")   // drög án númers
+        XCTAssertEqual(inv.documentFileName, "Reikningur-drög")   // drög án númers
         inv.issue()
-        XCTAssertEqual(inv.documentFileName, "R-001")
+        XCTAssertEqual(inv.documentFileName, "Reikningur-R-001")
     }
 
     // MARK: - Textar

@@ -1541,6 +1541,39 @@
         }
       }
     },
+    "Fela RUKK": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide RUKK"
+          }
+        }
+      }
+    },
+    "Fela önnur": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hide Others"
+          }
+        }
+      }
+    },
+    "Sýna öll": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show All"
+          }
+        }
+      }
+    },
     "Prenta…": {
       "extractionState": "manual",
       "localizations": {

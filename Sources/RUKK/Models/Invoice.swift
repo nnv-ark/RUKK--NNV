@@ -135,10 +135,19 @@ final class Invoice {
     }
 
     /// Skráarheiti fyrir PDF/viðhengi: reikningsnúmer, tilboðsnúmer eða „reikningur“.
+    /// Skráarheiti (án .pdf) við vistun, prentun („Vista sem PDF“), póst og drátt:
+    /// alltaf „Reikningur-[númer]“ — tilboð „Tilboð-[númer]“, ónúmeruð drög „…-drög“.
     var documentFileName: String {
-        if !number.isEmpty { return number }
-        if isEstimate && !estimateNumber.isEmpty { return estimateNumber }
-        return "reikningur"
+        let heiti: String
+        if isEstimate {
+            heiti = estimateNumber.isEmpty ? "Tilboð-drög" : "Tilboð-\(estimateNumber)"
+        } else {
+            heiti = number.isEmpty ? "Reikningur-drög" : "Reikningur-\(number)"
+        }
+        // Stafir sem Finder/skráakerfið leyfir ekki í skráarheiti verða að bandstriki.
+        return heiti
+            .components(separatedBy: CharacterSet(charactersIn: "/:\\?%*|\"<>"))
+            .joined(separator: "-")
     }
 
     /// Gildistími tilboðs: sérstilltur (finalDueDate) ef settur, annars útgáfudagur + 30 dagar.

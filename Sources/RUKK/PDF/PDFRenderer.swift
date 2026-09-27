@@ -34,6 +34,9 @@ enum PDFRenderer {
         guard let op = doc.printOperation(for: info, scalingMode: .pageScaleToFit, autoRotate: false) else {
             NSSound.beep(); return
         }
+        // Heiti prentverksins — „Vista sem PDF“ í prentglugganum stingur upp á
+        // „Reikningur-[númer].pdf“ í stað „Untitled“.
+        op.jobTitle = invoice.documentFileName
         op.showsPrintPanel = true
         op.showsProgressPanel = true
         op.run()
